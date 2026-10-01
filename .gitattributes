@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Copied byte for byte from Orangey, where one of them is CRLF on purpose:
+# it proves CRLF parsing works, so git must never normalise these.
+vendor/orangey/tests/fixtures/** -text
