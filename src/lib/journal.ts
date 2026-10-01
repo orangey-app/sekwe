@@ -26,6 +26,11 @@ export interface Journal {
   created: string;
   modified: string;
   doc: DocJSON;
+  /**
+   * A copy of every oracle version this journal has rolled, keyed
+   * "<oracle id>@<version>" (see roller.ts), so it re-rolls without the library.
+   */
+  oracles?: Record<string, Record<string, unknown>>;
 }
 
 /** What the journal menu needs, without carrying every document around. */

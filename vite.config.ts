@@ -56,6 +56,10 @@ export default defineConfig(({ mode }) => {
             },
           }),
         ],
-    build: single ? { outDir: "dist", emptyOutDir: false, copyPublicDir: false } : { outDir: "dist", emptyOutDir: true },
+    // The editor and the roll engine come to about 450 kB; one file is fine for
+    // an app that is cached after the first visit, so Vite need not warn about it.
+    build: single
+      ? { outDir: "dist", emptyOutDir: false, copyPublicDir: false, chunkSizeWarningLimit: 1000 }
+      : { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 1000 },
   };
 });

@@ -2,15 +2,15 @@
   "note": "Copied by scripts/sync-orangey.mjs. Do not edit these files: change Orangey and sync again.",
   "orangey": {
     "version": "0.8.0",
-    "commit": "99258f5b478166781712475ab15ef85129f893e9",
+    "commit": "2c3db16b30e733b7ff4dad9ecb37cae874fead2b",
     "uncommitted": false
   },
-  "synced": "2026-10-01T11:57:57.758Z",
+  "synced": "2026-10-01T12:47:41.038Z",
   "excluded": {
     "src/model/settings-file.ts": "Orangey's own settings file (scheme, feel, mascot); it checks against timings that live in Orangey's ui/feel.ts"
   },
   "counts": {
-    "sources": 36,
+    "sources": 37,
     "tests": 14,
     "fixtures": 9,
     "harness": 1
@@ -44,11 +44,12 @@
     "src/import/parse.ts": "4fe96df0773b80cbc807b8f7f2b46b9d93dfc7525921c5462500d1f9d52486ac",
     "src/import/quick.ts": "2166df2a94f4d4ca2edc34ceb42435c879e4dc43166a155591710a2b11d630ec",
     "src/storage/appdb.ts": "ce435c75007250a498aed30443dfa29b479a1f1adab237668290fe3795fd4958",
-    "src/storage/fsdir.ts": "7d2cbbb41386656ef622746fb39170313aa7aa555a708307c95dcea5e8a2f9ac",
+    "src/storage/fsdir.ts": "895d5698ce366c6b64be36330cf9212a5e63ab69f495b7aad019987cc01c29c3",
     "src/storage/idb.ts": "dcfc20d6cd1ebe668ae8b892d1b18ecebe0d300ba7089eb9f993a7d7b274e883",
     "src/storage/images.ts": "bf7ac3750c614b61d269af16121b363a3bd2bb79369d637bb530c948b679ec82",
     "src/storage/library.ts": "40934124ed013a70de35d88bfba1e54cdaa576450f0c83d4ebe5430eab08a19e",
     "src/storage/libraryfile.ts": "a03c7b8bb42880c17d861c1e5a0e7697d470517826efba3927daeaab9a9067c7",
+    "src/storage/locate.ts": "8e684a4114355a81791f333bb828e89f78e1e26b6983bd15d172c4253cd4f64d",
     "src/storage/memory.ts": "e0b399e9dca6849374af45b55b0c46622baf2d7590352eb42a03647ad722c0b9",
     "src/storage/paths.ts": "b37edc629a194d0a027b8be222acc3858e4b2f614cc209119c5cd1fc67b17da5",
     "src/storage/zip.ts": "f6174e507b8cd96178bf1053105034cdb2eda21a21d9ba7184443b891a91c141",

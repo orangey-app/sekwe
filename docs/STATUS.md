@@ -14,12 +14,22 @@ Read this first when picking the work up again.
   unit and browser tests. Packages: Vite 8.3, Svelte 5.57, Tiptap 3.31,
   TypeScript 7.0 (see package-lock.json).
 
-## Next — step 4: rolling
+- **Step 4, first slice: rolling.** Orangey's library-location rule moved to
+  its `src/storage/locate.ts` (shared through the sync). Here: the library
+  reader (`src/lib/oracles.ts`), roll records and the roller with journal
+  snapshots (`rolls.ts`, `roller.ts`), the chip, the inkblot picture and
+  Alt+R / Alt+N (`rollnodes.ts`), the slash command (`slash.ts`), the chip's
+  pop-up and the oracle panel, and `scripts/serve-both.mjs`.
 
-Rolling from the user's Orangey library, read where Orangey keeps it (OPFS
-folder `library`, IndexedDB database `orangey`, or a folder on disk the user
-picked, which needs one permission click): the slash command, the re-roll key,
-the shelf, and roll chips in the text.
+## Next — step 4, second slice
+
+- Picks: a list with `offer` shows its choices at the cursor; the pick lands,
+  marked as picked.
+- Bags: what a bag has drawn is kept in the journal.
+- The shelf: pinned oracles as buttons, a shared default that each journal
+  can override.
+- The chip's full menu: turn into text, copy link, open in Orangey.
+- Boards in the slash menu (roll every oracle on it?), to be decided.
 
 ## Notes for whoever builds next
 

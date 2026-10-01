@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **Oracles roll into the text.** Type `/` and part of a name: the matching
+  oracles from your Orangey library pop up at the cursor, with their folders,
+  and Enter rolls one in place of what was typed. `/2d6` and any dice
+  expression roll as dice. A roll sits in the text as a chip.
+- **Rolling again.** Alt+R rolls the last oracle again at the cursor. Click a
+  chip and Alt+R re-rolls it in place; its earlier results stay, listed in the
+  chip's pop-up, and the chip carries a ↻ count.
+- **Chains.** An outcome that goes to another oracle shows "→ name" in its
+  chip, and Alt+N rolls that oracle. It is never rolled by itself.
+- **Inkblots.** A small blot in the text, drawn with Orangey's own shape
+  maths; the pop-up shows it large, and *Put in the text* places the full
+  picture below the paragraph, drawn a few rows at a time and only when on
+  screen. It is stored as its number.
+- **The library, read where Orangey keeps it**, with Orangey's own code: the
+  browser's storage, or a folder on disk after one click (*Open my Orangey
+  folder*). Storyboard only reads it, and reads it again when its tab comes
+  back, so an edit in Orangey counts from the next roll. Opened from disk,
+  Storyboard says it cannot see the library; dice still roll.
+- **Every oracle rolled is copied into the journal** (each version once, with
+  the oracle a chain leads to), so a journal re-rolls without the library.
+- **`npm run serve:both`** serves Orangey and Storyboard from one local
+  address, so they share storage as they will when published.
+
 - **A page to write on.** One screen: the journal's title, a slim toolbar
   (scene and beat headings, bold, italic, lists, quote, separator, undo and
   redo) and the text, set in a serif at a comfortable width, light or dark

@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "vite build && vite build --mode single",
     "preview": "vite preview",
+    "serve:both": "node scripts/serve-both.mjs",
     "sync": "node scripts/sync-orangey.mjs",
     "sync:status": "node scripts/sync-orangey.mjs --status",
     "check": "node scripts/check.mjs",

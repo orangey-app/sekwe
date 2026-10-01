@@ -13,6 +13,7 @@ import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch, serve } from "../../vendor/orangey/tests/browser/cdp.mjs";
+import { serveBoth } from "../../scripts/serve-both.mjs";
 
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const dist = join(root, "dist");
@@ -219,6 +220,271 @@ await test("F the single file runs from disk and keeps what is written", async (
   assert.equal(await pageText(page), "From a USB stick.");
   assert.equal(await page.evaluate(`return document.querySelectorAll("script[src], link[rel=stylesheet]").length`), 0, "the single file loads something from outside itself");
   assert.deepEqual(page.consoleErrors, []);
+});
+
+// --- rolling from the Orangey library --------------------------------------------
+
+const ORACLES = {
+  "Starforged/Weather.orangey.json": { id: "weather", type: "list", name: "Weather", view: "wheel", items: ["Rain", "Sun", "Fog"].map((label, i) => ({ id: `w${i}`, label, weight: 1 })) },
+  "Starforged/NPC.orangey.json": { id: "npc", type: "list", name: "NPC Role", view: "wheel", items: ["Smuggler", "Pilot"].map((label, i) => ({ id: `n${i}`, label, weight: 1, goesTo: "motive" })) },
+  "Starforged/Motive.orangey.json": { id: "motive", type: "list", name: "NPC Motive", view: "list", items: ["Greed", "Debt"].map((label, i) => ({ id: `m${i}`, label, weight: 1 })) },
+  "Inkblot.orangey.json": { id: "ink", type: "inkblot", name: "Inkblot" },
+  "Tonight.orangey.json": { id: "board", type: "board", name: "Tonight", entries: [{ id: "weather", name: "Weather" }] },
+};
+
+/** Writes randomizer files where Orangey keeps a browser library: the origin's own filesystem, folder "library". */
+async function seedLibrary(page, files = ORACLES) {
+  await page.evaluate(`
+    const files = ${JSON.stringify(files)};
+    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle("library", { create: true });
+    for (const [path, r] of Object.entries(files)) {
+      const parts = path.split("/");
+      let dir = root;
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+      const at = "2026-10-01T09:00:00.000Z";
+      const file = await dir.getFileHandle(parts.at(-1), { create: true });
+      const w = await file.createWritable();
+      await w.write(JSON.stringify({ format: "orangey", version: 1, randomizer: { created: at, modified: at, ...r } }, null, 2));
+      await w.close();
+    }
+  `);
+}
+
+const openSeeded = async (page, seed = "storyboard") => {
+  await page.goto(`${server.origin}/index.html?debug&seed=${seed}`);
+  await ready(page);
+  await page.waitForFunction(`window.storyboard.library.status !== "idle"`);
+};
+
+async function press(page, key, { alt = false, ctrl = false } = {}) {
+  const code = key.length === 1 ? `Key${key.toUpperCase()}` : key;
+  const vk = key.length === 1 ? key.toUpperCase().charCodeAt(0) : { Enter: 13, Escape: 27, ArrowDown: 40, ArrowUp: 38 }[key];
+  const modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0);
+  const text = key === "Enter" ? "\r" : undefined;
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, modifiers, windowsVirtualKeyCode: vk, ...(text && !alt && !ctrl ? { text } : {}) });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, modifiers, windowsVirtualKeyCode: vk });
+}
+
+/** A real mouse click on the middle of an element, as a person would. */
+async function clickOn(page, selector) {
+  const box = await page.evaluate(`
+    const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  `);
+  for (const type of ["mousePressed", "mouseReleased"]) {
+    await page.send("Input.dispatchMouseEvent", { type, x: box.x, y: box.y, button: "left", clickCount: 1 });
+  }
+}
+
+const chips = (page) =>
+  page.evaluate(`
+    const out = [];
+    window.storyboard.editor.state.doc.descendants((n) => {
+      if (n.type.name === "roll") out.push(n.attrs.record);
+    });
+    return out;
+  `);
+const currentText = (record) => record.results.at(-1).text;
+
+async function slashRoll(page, query) {
+  await typeText(page, `/${query}`);
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item")`);
+  await press(page, "Enter");
+}
+
+await test("G the library is read where Orangey keeps it: oracles, not boards, with the count in the panel", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  assert.equal(await page.evaluate(`return window.storyboard.library.status`), "ready");
+  assert.deepEqual(await page.evaluate(`return window.storyboard.library.oracles.map((o) => o.name).sort()`), ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
+  await page.click(".shelf-toggle");
+  assert.match(await page.evaluate(`return document.querySelector(".library-panel").textContent`), /4 oracles from your Orangey library/);
+});
+
+await test("G / and part of a name rolls the oracle into the text, and the journal keeps a copy of it", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await typeText(page, "The sky: ");
+  await typeText(page, "/wea");
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item .slash-main")?.textContent === "Weather"`);
+  assert.equal(await page.evaluate(`return document.querySelector(".slash-menu .slash-aside").textContent`), "Starforged");
+  await press(page, "Enter");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  assert.equal(await page.evaluate(`return document.querySelector(".slash-menu")`), null, "the menu stayed open");
+  const [record] = await chips(page);
+  assert.ok(["Rain", "Sun", "Fog"].includes(currentText(record)), currentText(record));
+  assert.equal(await pageText(page), `The sky: ${currentText(record)}`, "the typed /wea was left in the text");
+  await saved(page);
+  const stored = await page.evaluate(`return (await window.storyboard.store.get(window.storyboard.session.view().currentId))`);
+  assert.deepEqual(Object.keys(stored.oracles), [`weather@${record.source.version}`]);
+  // And back after a reload, as the same chip.
+  await openSeeded(page);
+  assert.deepEqual(await chips(page), [record]);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("G dice roll by expression, and a name that matches nothing says so without eating Enter", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await slashRoll(page, "2d6");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  const total = Number(currentText((await chips(page))[0]));
+  assert.ok(total >= 2 && total <= 12, String(total));
+  await typeText(page, " /zzz");
+  await page.waitForFunction(`document.querySelector(".slash-item[data-kind=note]")?.textContent.includes("No oracle matches")`);
+  await press(page, "Escape");
+  await page.waitForFunction(`!document.querySelector(".slash-menu")`);
+});
+
+await test("H Alt+R rolls the last oracle again at the cursor; on a selected chip it re-rolls in place and keeps the history", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await slashRoll(page, "weather");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 1`);
+  await typeText(page, " then ");
+  await press(page, "r", { alt: true });
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  assert.doesNotMatch(await pageText(page), /®|r$/, "Alt+R typed a character");
+
+  await clickOn(page, ".page .chip");
+  await page.waitForFunction(`document.querySelector(".chip-popover")`);
+  const before = (await chips(page))[0];
+  await press(page, "r", { alt: true });
+  await page.waitForFunction(`document.querySelector(".page .chip").dataset.rerolled === "1"`);
+  const after = (await chips(page))[0];
+  assert.equal(after.results.length, 2);
+  assert.deepEqual(after.results[0], before.results[0], "the first result was not kept");
+  assert.equal((await chips(page)).length, 2, "re-rolling added a chip");
+  // The pop-up lists both results, newest first.
+  await page.waitForFunction(`document.querySelectorAll(".chip-popover .history li").length === 2`);
+  await saved(page);
+  await openSeeded(page);
+  assert.equal((await chips(page))[0].results.length, 2, "the history did not survive a reload");
+});
+
+await test("H a chain: the result offers the oracle it goes to, and Alt+N rolls it, never by itself", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await slashRoll(page, "npc role");
+  await page.waitForFunction(`document.querySelector(".page .chip .chip-next")`);
+  assert.equal(await page.evaluate(`return document.querySelector(".chip-next").textContent`), "→ NPC Motive");
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal((await chips(page)).length, 1, "the next oracle was rolled without being asked");
+  await press(page, "n", { alt: true });
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  const [, next] = await chips(page);
+  assert.equal(next.source.id, "motive");
+  assert.ok(["Greed", "Debt"].includes(currentText(next)));
+});
+
+await test("I a wheel edited in Orangey rolls as edited once the tab is back, and a deleted one still re-rolls from the journal's copy", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await slashRoll(page, "weather");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  const first = (await chips(page))[0];
+
+  // Edited in Orangey (here, written straight into the library), then the tab comes back.
+  await seedLibrary(page, { "Starforged/Weather.orangey.json": { ...ORACLES["Starforged/Weather.orangey.json"], items: [{ id: "s", label: "Snow", weight: 1 }] } });
+  await page.evaluate(`window.dispatchEvent(new Event("focus"))`);
+  await page.waitForFunction(`window.storyboard.library.byId("weather").randomizer.items[0].label === "Snow"`);
+  assert.deepEqual((await chips(page))[0], first, "reading the library changed the text");
+  await typeText(page, " ");
+  await slashRoll(page, "weather");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  assert.equal(currentText((await chips(page))[1]), "Snow");
+
+  // Deleted from the library: the first chip still re-rolls, from its own version.
+  await page.evaluate(`
+    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle("library");
+    await (await root.getDirectoryHandle("Starforged")).removeEntry("Weather.orangey.json");
+  `);
+  await new Promise((r) => setTimeout(r, 1100));
+  await page.evaluate(`window.dispatchEvent(new Event("focus"))`);
+  await page.waitForFunction(`window.storyboard.library.byId("weather") === null`);
+  await clickOn(page, ".page .chip");
+  await press(page, "r", { alt: true });
+  await page.waitForFunction(`document.querySelector(".page .chip").dataset.rerolled === "1"`);
+  assert.ok(["Rain", "Sun", "Fog"].includes(currentText((await chips(page))[0])), "the re-roll did not use the version the chip came from");
+});
+
+await test("J an inkblot lands as a small blot in the text, and Put in the text adds the picture below the paragraph", async (page) => {
+  await open(page);
+  await seedLibrary(page);
+  await openSeeded(page);
+  await typeText(page, "It looks like ");
+  await slashRoll(page, "inkblot");
+  await page.waitForFunction(`document.querySelector(".page .chip canvas.chip-blot")`);
+  const [record] = await chips(page);
+  const blot = record.results[0].blot;
+  assert.ok(Number.isInteger(blot), "no blot number");
+  const inked = await page.evaluate(`
+    const c = document.querySelector(".chip-blot");
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let dark = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 120) dark++;
+    return dark;
+  `);
+  assert.ok(inked > 20, "the thumbnail has no ink on it");
+  await clickOn(page, ".page .chip");
+  await page.waitForFunction(`document.querySelector(".chip-popover .put")`);
+  await page.click(".chip-popover .put");
+  await page.waitForFunction(`document.querySelector(".page figure.blot-picture")?.dataset.state === "drawn"`, 20000);
+  const order = await page.evaluate(`return [...document.querySelector(".page").children].map((e) => e.tagName)`);
+  // The empty paragraph after it is Tiptap's: there is always a line to go on writing on.
+  assert.deepEqual(order, ["P", "FIGURE", "P"], "the picture is not below the paragraph");
+  assert.match(await page.evaluate(`return document.querySelector("figure.blot-picture figcaption").textContent`), new RegExp(`#${blot}`));
+  await saved(page);
+  await openSeeded(page);
+  await page.waitForFunction(`document.querySelector(".page figure.blot-picture")?.dataset.state === "drawn"`, 20000);
+  assert.equal((await chips(page)).length, 1, "the chip went when the picture came");
+});
+
+await test("K opened from disk, it says it cannot see the library, and dice still roll", async (page) => {
+  const file = `file://${join(dist, "storyboard.html")}?debug&seed=disk`;
+  await page.goto(file);
+  await ready(page);
+  await page.click(".shelf-toggle");
+  assert.match(await page.evaluate(`return document.querySelector(".library-panel").textContent`), /opened from disk/);
+  await slashRoll(page, "d20");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("L served beside Orangey, Storyboard rolls a wheel made in Orangey itself", async (page) => {
+  const orangeyDist = join(root, "..", "orangey", "dist");
+  if (!existsSync(join(orangeyDist, "index.html"))) {
+    console.log("    (no Orangey build beside this folder: run npm run build in ../orangey; skipped)");
+    return;
+  }
+  const both = serveBoth({ orangey: orangeyDist, storyboard: dist });
+  await new Promise((r) => both.listen(0, "127.0.0.1", r));
+  const origin = `http://127.0.0.1:${both.address().port}`;
+  try {
+    await page.goto(`${origin}/orangey/index.html?debug&noseed`);
+    await page.waitForFunction("window.orangey && window.orangey.state.ready");
+    await page.evaluate(`
+      const { state } = window.orangey;
+      const at = new Date().toISOString();
+      await state.library.create("", { id: "made-in-orangey", type: "list", name: "Harbour Rumour", view: "wheel", created: at, modified: at,
+        items: [{ id: "a", label: "The tide is late", weight: 1 }] });
+      await state.library.flush();
+    `);
+    await page.goto(`${origin}/storyboard/index.html?debug`);
+    await ready(page);
+    await page.waitForFunction(`window.storyboard.library.status === "ready"`);
+    await slashRoll(page, "harbour");
+    await page.waitForFunction(`document.querySelector(".page .chip")`);
+    assert.equal(currentText((await chips(page))[0]), "The tide is late");
+  } finally {
+    await new Promise((r) => both.close(r));
+  }
 });
 
 // --- report -------------------------------------------------------------------

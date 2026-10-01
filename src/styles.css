@@ -326,3 +326,263 @@ input {
     background: var(--paper);
   }
 }
+
+/* --- rolls in the text --------------------------------------------------------- */
+
+:root {
+  --chip-bg: #e9eef3;
+  --chip-ink: #24384c;
+  --chip-line: #c9d5e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chip-bg: #263241;
+    --chip-ink: #d6e4f2;
+    --chip-line: #3b4b5e;
+  }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0 0.4em;
+  margin: 0 0.05em;
+  border-radius: 4px;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  box-shadow: inset 0 0 0 1px var(--chip-line);
+  cursor: pointer;
+  line-height: 1.35;
+  vertical-align: baseline;
+}
+
+.chip[data-rerolled]::after {
+  content: "↻" attr(data-rerolled);
+  font-family: var(--font-ui);
+  font-size: 0.65em;
+  opacity: 0.7;
+}
+
+.chip-next {
+  font-family: var(--font-ui);
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+
+.chip-blot {
+  height: 1.4em;
+  width: auto;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.ProseMirror-selectednode.chip,
+.chip.ProseMirror-selectednode {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.blot-picture {
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+.blot-picture canvas {
+  width: 100%;
+  max-width: 36rem;
+  height: auto;
+  aspect-ratio: 1 / 1.3;
+  border-radius: 4px;
+  background: #fbf8f1;
+}
+
+.blot-picture[data-state="drawn"] canvas {
+  aspect-ratio: auto;
+}
+
+.blot-picture figcaption {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  margin-top: 0.4em;
+}
+
+.blot-picture.ProseMirror-selectednode canvas {
+  outline: 2px solid var(--accent);
+}
+
+/* --- the slash menu and the chip's pop-up ---------------------------------------- */
+
+.slash-menu,
+.chip-popover {
+  position: fixed;
+  z-index: 20;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.14);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+}
+
+.slash-menu {
+  min-width: 16rem;
+  max-width: 26rem;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.25rem;
+}
+
+.slash-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.slash-item[aria-selected="true"] {
+  background: var(--pressed);
+}
+
+.slash-item[data-kind="note"] {
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.slash-item[data-kind="open-folder"] .slash-main,
+.slash-item[data-kind="dice"] .slash-main {
+  color: var(--accent);
+}
+
+.slash-aside {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-popover {
+  width: 20rem;
+  padding: 0.75rem;
+}
+
+.chip-popover .from {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.chip-popover .detail {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.chip-popover .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip-popover button,
+.open-folder {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+.chip-popover button:hover,
+.open-folder:hover {
+  background: var(--hover);
+}
+
+kbd {
+  font-family: var(--font-ui);
+  font-size: 0.75em;
+  padding: 0 0.3em;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-soft);
+}
+
+.blot-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+}
+
+.history {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0 0 1.4rem;
+  border-top: 1px solid var(--line);
+  max-height: 9rem;
+  overflow: auto;
+  color: var(--ink-soft);
+}
+
+.history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.history li.now {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.history .at {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.875rem;
+  z-index: 30;
+}
+
+/* --- the oracle panel ---------------------------------------------------------- */
+
+.library-panel h2 {
+  font-size: 0.9375rem;
+  margin: 0 0 0.6rem;
+}
+
+.library-panel p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0 0 0.6rem;
+}
+
+.library-panel .hint {
+  color: var(--ink-soft);
+}
+
+.shelf-toggle.attention::after {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 0.45em;
+  margin-left: 0.35em;
+  border-radius: 50%;
+  background: var(--warn);
+  vertical-align: middle;
+}

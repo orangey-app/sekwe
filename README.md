@@ -5,8 +5,9 @@ an answer, an oracle from [Orangey](https://github.com/orangey-app/orangey)
 rolls straight into the text at the cursor. No page switching, no server, no
 account, and it works offline.
 
-**Status:** the writing page works — journals, formatting, autosave, offline —
-but oracles do not roll into it yet. `docs/STATUS.md` says where the work
+**Status:** journals, formatting, autosave and offline work, and oracles from
+your Orangey library roll into the text (`/` and a name, Alt+R, Alt+N). Picks,
+bags, the shelf and the chip's full menu come next. `docs/STATUS.md` says where the work
 stands; the plan and the decisions behind it are in the project's plan
 document.
 
@@ -16,7 +17,27 @@ document.
 npm run dev       a live page at http://localhost:5173 (no offline worker in this mode)
 npm run build     dist/ (the site, with its offline worker) and dist/storyboard.html (one file)
 npm run preview   serves dist/ at http://localhost:4173, offline worker included
+npm run serve:both  Orangey and Storyboard together at http://127.0.0.1:4321 (build both first)
 ```
+
+Storyboard reads the Orangey library of the site it is served from: browsers
+keep each site's storage apart, so it only sees a library made in Orangey at
+the same address. That is what `serve:both` is for when trying it locally.
+
+## Rolling
+
+- **`/` and part of a name** (`/npc mot`) rolls an oracle into the text;
+  `/2d6` rolls dice. Arrow keys choose, Enter rolls, Escape closes.
+- **Alt+R** rolls the last oracle again at the cursor; with a chip selected
+  (click it), it re-rolls that chip, keeping the earlier results.
+- **Alt+N** follows an outcome that goes to another oracle (the chip shows
+  "→ name"). It never rolls by itself.
+- An **inkblot** lands as a small blot; click it and choose *Put in the text*
+  for the full picture below the paragraph.
+- Every oracle rolled is copied into the journal, so a journal re-rolls
+  offline, on another computer, or after the wheel is deleted. A wheel edited
+  in Orangey rolls as edited from the next roll (Storyboard reads the library
+  again whenever its tab comes back); what is already in the text never changes.
 
 `dist/storyboard.html` also opens straight from disk: double-click it.
 

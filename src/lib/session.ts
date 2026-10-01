@@ -8,6 +8,7 @@ import type { Editor } from "@tiptap/core";
 import { Autosaver, type SaveStatus } from "./autosave.ts";
 import { cleanTitle, freshTitle, newJournal, summarize, type DocJSON, type Journal, type JournalSummary } from "./journal.ts";
 import type { JournalStore } from "./store.ts";
+import type { Snapshots } from "./roller.ts";
 
 export interface SessionView {
   journals: JournalSummary[];
@@ -89,8 +90,21 @@ export class Session {
    */
   #snapshot(): Journal {
     const j = this.#current!;
-    return { ...j, title: cleanTitle(this.#title), doc: this.#editor!.getJSON() as DocJSON, modified: new Date().toISOString() };
+    const saved: Journal = { ...j, title: cleanTitle(this.#title), doc: this.#editor!.getJSON() as DocJSON, modified: new Date().toISOString() };
+    if (Object.keys(this.#oracles).length) saved.oracles = { ...this.#oracles };
+    return saved;
   }
+
+  /** The open journal's copies of the oracles it has rolled. */
+  #oracles: Record<string, Record<string, unknown>> = {};
+
+  readonly snapshots: Snapshots = {
+    get: (key) => this.#oracles[key],
+    put: (key, packed) => {
+      this.#oracles[key] = packed;
+      this.#changed();
+    },
+  };
 
   #changed = (): void => {
     this.#saver.change(() => this.#snapshot());
@@ -112,6 +126,7 @@ export class Session {
     this.#editor?.destroy();
     this.#current = j;
     this.#title = j.title;
+    this.#oracles = { ...(j.oracles ?? {}) };
     // A fresh editor per journal, so Undo never reaches into another journal.
     this.#editor = this.#make(j.doc, this.#changed);
     await this.#store.setLastOpen(id);

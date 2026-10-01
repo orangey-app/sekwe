@@ -1,5 +1,6 @@
 /**
- * The writing surface: Tiptap with StarterKit, configured for a journal.
+ * The writing surface: Tiptap with StarterKit, configured for a journal, plus
+ * the rolls (chips, inkblot pictures, Alt+R / Alt+N) and the slash command.
  * Headings are levels 2 and 3 (scenes and beats); level 1 is the journal's
  * title, which lives outside the text.
  */
@@ -7,6 +8,8 @@
 import { Editor, type JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import type { DocJSON } from "./journal.ts";
+import { InkblotPicture, RollChip, RollKeys, type RollControl } from "./rollnodes.ts";
+import { SlashCommand, type SlashSource } from "./slash.ts";
 
 export interface EditorOptions {
   element: HTMLElement;
@@ -15,6 +18,8 @@ export interface EditorOptions {
   onTransaction?: () => void;
   /** Put the cursor at the end of the text. Off when the title should be typed first. */
   focus?: boolean;
+  control?: RollControl;
+  slash?: SlashSource;
 }
 
 export function createEditor(o: EditorOptions): Editor {
@@ -28,6 +33,10 @@ export function createEditor(o: EditorOptions): Editor {
         link: false,
         underline: false,
       }),
+      RollChip,
+      InkblotPicture,
+      RollKeys.configure({ control: o.control ?? null }),
+      SlashCommand.configure({ source: o.slash ?? null }),
     ],
     content: o.doc as JSONContent,
     autofocus: o.focus === false ? false : "end",
