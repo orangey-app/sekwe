@@ -1,7 +1,6 @@
 # Sekwe
 
-*sekʷe*, said SEK-weh: from two old roots that sound alike, *sekʷ-* "to
-tell" and *sekʷ-* "to follow". 
+*sekʷe*, said SEK-weh: to tell, to follow
 
 A writing page for solo roleplaying games. You write the story; when it needs
 an answer, an oracle from [Orangey](https://github.com/orangey-app/orangey)
