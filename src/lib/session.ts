@@ -35,6 +35,8 @@ export interface SessionView {
   problem: string | null;
   folders: string[];
   commands: JournalCommand[];
+  /** The side panel's open folders. */
+  openFolders: string[];
 }
 
 export type EditorRole = "story" | "status";
@@ -53,6 +55,7 @@ interface Extras {
   commands: JournalCommand[];
   recent: string[];
   copy: LibraryCopy | null;
+  openFolders: string[];
 }
 
 /**
@@ -68,6 +71,7 @@ const extrasOf = (j: Journal): Extras => ({
   commands: clone(j.commands ?? []),
   recent: [...(j.recent ?? [])],
   copy: j.copy ? clone(j.copy) : null,
+  openFolders: [...(j.openFolders ?? [])],
 });
 
 export class Session {
@@ -82,7 +86,7 @@ export class Session {
   #title = "";
   #status: SaveStatus = "saved";
   #problem: string | null = null;
-  #x: Extras = { oracles: {}, bags: {}, folders: [], commands: [], recent: [], copy: null };
+  #x: Extras = { oracles: {}, bags: {}, folders: [], commands: [], recent: [], copy: null, openFolders: [] };
 
   constructor(store: JournalStore, make: MakeEditor, notify: (view: SessionView) => void, saverOptions: { delayMs?: number } = {}) {
     this.#store = store;
@@ -112,6 +116,7 @@ export class Session {
       problem: this.#problem,
       folders: this.#x.folders,
       commands: this.#x.commands,
+      openFolders: this.#x.openFolders,
     };
   }
 
@@ -163,6 +168,7 @@ export class Session {
     keep("folders", x.folders, x.folders.length === 0);
     keep("commands", x.commands, x.commands.length === 0);
     keep("recent", x.recent, x.recent.length === 0);
+    keep("openFolders", x.openFolders, x.openFolders.length === 0);
     if (x.copy) saved.copy = clone(x.copy);
     else delete saved.copy;
     return saved;
@@ -220,6 +226,15 @@ export class Session {
     if (copy === this.#x.copy) return;
     this.#x.copy = copy;
     this.#changed();
+  }
+
+  /** The side panel's open folders (kept with the journal). */
+  setOpenFolders(open: string[]): void {
+    const next = [...new Set(open)].sort((a, b) => a.localeCompare(b));
+    if (JSON.stringify(next) === JSON.stringify(this.#x.openFolders)) return;
+    this.#x.openFolders = next;
+    this.#changed();
+    this.#emit();
   }
 
   setCommands(commands: JournalCommand[]): void {

@@ -819,3 +819,17 @@ mark { color: inherit; border-radius: 2px; padding: 0 0.05em; }
 /* Deleting a journal. */
 .menu-item.danger, button.danger { color: var(--danger, #b3261e); }
 .open-folder.danger { background: var(--danger, #b3261e); border-color: var(--danger, #b3261e); color: #fff; }
+
+/* The oracle tree in the side panel. */
+.library-panel .show-all { font-size: 0.8125rem; display: inline-flex; gap: 0.3rem; align-items: center; }
+.tree-tools { display: flex; gap: 0.6rem; align-items: center; margin: 0.5rem 0; }
+.tree-tools .tree-filter { flex: 1; min-width: 0; font: inherit; font-size: 0.875rem; padding: 0.25rem 0.45rem; }
+.tree-tools button[disabled] { opacity: 0.4; cursor: default; }
+.oracle-tree ul { list-style: none; margin: 0; padding: 0 0 0 0.9rem; }
+.oracle-tree > ul { padding-left: 0; }
+.oracle-tree .folder-row { display: flex; align-items: center; gap: 0.3rem; }
+.oracle-tree .folder-head { flex: 1; display: flex; align-items: center; gap: 0.35rem; border: 0; background: none; padding: 0.2rem 0.25rem; font: inherit; font-size: 0.875rem; font-weight: 600; color: inherit; cursor: pointer; text-align: left; border-radius: 4px; }
+.oracle-tree .folder-head:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.oracle-tree .caret { width: 0.8rem; color: var(--ink-soft); }
+.oracle-tree .folder-count { margin-left: auto; font-weight: 400; font-size: 0.75rem; color: var(--ink-soft); }
+.oracle-tree .pack-badge { font-weight: 400; font-size: 0.6875rem; padding: 0 0.4rem; border-radius: 999px; background: color-mix(in srgb, var(--accent) 15%, transparent); }

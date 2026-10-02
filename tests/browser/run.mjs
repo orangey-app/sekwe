@@ -420,9 +420,39 @@ await test("G the library is read where Orangey keeps it: oracles, not boards, w
   assert.equal(await page.evaluate(`return window.sekwe.library.status`), "ready");
   assert.deepEqual(await page.evaluate(`return window.sekwe.library.oracles.map((o) => o.name).sort()`), ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
   await page.click("#tab-oracles");
-  const names = await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .oracle-button")].map((b) => b.textContent)`);
-  assert.deepEqual(names, ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
-  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .group-head")].map((b) => b.textContent)`), ["Starforged"]);
+  // Folders start closed: only what is at the top shows, with each folder's count.
+  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .oracle-button")].map((b) => b.textContent)`), ["Inkblot"]);
+  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .folder-head")].map((b) => b.querySelector(".folder-name").textContent + " " + b.querySelector(".folder-count").textContent)`), ["Starforged 3"]);
+  await page.click(".tree-tools .expand-all");
+  await page.waitForFunction(`document.querySelectorAll(".oracle-tree .oracle-button").length === 4`);
+  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .oracle-button")].map((b) => b.textContent)`), ["NPC Motive", "NPC Role", "Weather", "Inkblot"]);
+});
+
+await test("G the oracle tree opens where it was left, collapses at once, and a filter shows only matches", async (page) => {
+  await open(page);
+  await seedLibrary(page, {
+    ...ORACLES,
+    "Starforged/Character/Goal.orangey.json": { id: "goal", type: "list", name: "Character Goal", view: "list", items: [{ id: "g0", label: "Revenge", weight: 1 }] },
+    "Delve/Theme.orangey.json": { id: "theme", type: "list", name: "Delve Theme", view: "list", items: [{ id: "t0", label: "Ancient", weight: 1 }] },
+  });
+  await openSeeded(page);
+  await page.click("#tab-oracles");
+  await page.evaluate(`document.querySelector('.folder-head[data-path="Starforged"]').click()`);
+  await page.waitForFunction(`document.querySelector('.folder-head[data-path="Starforged/Character"]')`);
+  assert.equal(await page.evaluate(`return !!document.querySelector('.oracle-button[data-id="goal"]')`), false, "a subfolder opened with its parent");
+  await saved(page);
+  await openSeeded(page);
+  await page.click("#tab-oracles");
+  await page.waitForFunction(`document.querySelector('.folder-head[data-path="Starforged"]')?.getAttribute("aria-expanded") === "true"`);
+  // Filter: only matches, their folders opened; clearing it gives the tree back as it was.
+  await page.evaluate(`const f = document.querySelector(".tree-filter"); f.value = "goal"; f.dispatchEvent(new Event("input", { bubbles: true }));`);
+  await page.waitForFunction(`document.querySelectorAll(".oracle-tree .oracle-button").length === 1 && document.querySelector('.oracle-button[data-id="goal"]')`);
+  await page.evaluate(`const f = document.querySelector(".tree-filter"); f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true }));`);
+  await page.waitForFunction(`!document.querySelector('.oracle-button[data-id="goal"]') && document.querySelector('.oracle-button[data-id="weather"]')`);
+  await page.click(".tree-tools .collapse-all");
+  await page.waitForFunction(`[...document.querySelectorAll(".folder-head")].every((b) => b.getAttribute("aria-expanded") === "false")`);
+  assert.deepEqual(await page.evaluate(`return window.sekwe.session.view().openFolders`), []);
+  assert.deepEqual(page.consoleErrors, []);
 });
 
 await test("G / and part of a name rolls the oracle into the text, and the journal keeps a copy of it", async (page) => {
@@ -643,9 +673,14 @@ await test("M Tab fills in what the matches share, then goes round the names; on
 await test("N a journal rolls only from the folders it is given, and keeps that choice", async (page) => {
   await openMore(page);
   await page.click("#tab-oracles");
-  await page.click(".folders-line .link-button");
-  await page.evaluate(`[...document.querySelectorAll(".folder-option")].find((l) => l.textContent.trim() === "Starforged").querySelector("input").click()`);
+  await page.click(".folders-line .show-all input");
+  await page.waitForFunction(`document.querySelector('.folder-pick[aria-label="Roll from Starforged"]')`);
+  await page.click('.folder-pick[aria-label="Roll from Starforged"]');
   await page.waitForFunction(`document.querySelector(".folders-now").textContent.trim() === "Starforged"`);
+  // With "Choose folders" off, only the journal's folders are in the tree.
+  await page.click(".folders-line .show-all input");
+  await page.click(".tree-tools .expand-all");
+  await page.waitForFunction(`document.querySelector('.oracle-button[data-id="weather"]')`);
   assert.equal(await page.evaluate(`return [...document.querySelectorAll(".oracle-button")].some((b) => b.textContent === "Inkblot")`), false, "an oracle outside the folder is listed");
   await typeText(page, "/inkbl");
   await page.waitForFunction(`document.querySelector(".slash-item[data-kind=note]")`);
@@ -659,6 +694,8 @@ await test("N an oracle clicked in the panel rolls at the cursor, and recent ora
   await openMore(page);
   await typeText(page, "Outside: ");
   await page.click("#tab-oracles");
+  await page.click(".tree-tools .expand-all");
+  await page.waitForFunction(`document.querySelector('.oracle-button[data-id="weather"]')`);
   await page.evaluate(`document.querySelector('.oracle-button[data-id="weather"]').click()`);
   await page.waitForFunction(`document.querySelector(".page .chip")`);
   assert.match(await pageText(page), /^Outside: (Rain|Sun|Fog)$/);
@@ -868,8 +905,9 @@ await test("V a journal saved as a file opens again: as a copy beside the origin
 await test("W a journal keeps a copy of its folders, and rolls them from disk on a computer without Orangey", async (page) => {
   await openMore(page);
   await page.click("#tab-oracles");
-  await page.click(".folders-line .link-button");
-  await page.evaluate(`[...document.querySelectorAll(".folder-option")].find((l) => l.textContent.trim() === "Starforged").querySelector("input").click()`);
+  await page.click(".folders-line .show-all input");
+  await page.waitForFunction(`document.querySelector('.folder-pick[aria-label="Roll from Starforged"]')`);
+  await page.click('.folder-pick[aria-label="Roll from Starforged"]');
   await page.waitForFunction(`window.sekwe.session.copy?.oracles.length > 0`);
   const copy = await page.evaluate(`return window.sekwe.session.copy.oracles.map((o) => o.id).sort()`);
   assert.deepEqual(copy, ["ask", "deck", "motive", "npc", "weather"], "the copy is not exactly the chosen folder");
@@ -904,7 +942,8 @@ await test("W a journal keeps a copy of its folders, and rolls them from disk on
   await page.click("#tab-oracles");
   await page.waitForFunction(`document.querySelector(".library-panel[data-copy=only]")`);
   assert.match(await page.evaluate(`return document.querySelector(".copy-note").textContent`), /copy this journal keeps/);
-  assert.equal(await page.evaluate(`return document.querySelectorAll(".oracle-button").length`), 5);
+  await page.click(".tree-tools .expand-all");
+  await page.waitForFunction(`document.querySelectorAll(".oracle-button").length === 5`);
   await page.evaluate(`window.sekwe.editor.commands.focus("end")`);
   await slashRoll(page, "npc role");
   await page.waitForFunction(`document.querySelector(".page .chip")`);

@@ -43,6 +43,8 @@ export interface Journal {
   bags?: Record<string, string[]>;
   /** Oracle ids, most recently rolled first: they come first in the slash menu. */
   recent?: string[];
+  /** The side panel's open folders, so the tree opens where it was left. */
+  openFolders?: string[];
   /**
    * A copy of the chosen folders (and what they lead to), so the journal rolls
    * on a computer without Orangey. Only kept when folders are chosen (copy.ts).

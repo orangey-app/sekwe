@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **The oracle panel is a tree.** Folders nest as in the library and start
+  closed, each with how many oracles it holds and a badge on a pack's folder.
+  Each journal remembers which folders are open. **Expand all** and
+  **Collapse all**, and a filter box that shows only matching oracles with
+  their folders opened. Choosing a journal's folders happens in the tree
+  (**Choose folders** shows every folder with a tick box); otherwise the tree
+  shows only the journal's folders.
+
 ## 0.1.0 — the first release
 
 - **Copy and paste carries the look.** Ctrl+C on the page now gives Word,

@@ -30,7 +30,7 @@
   import { locateLibrary } from "../vendor/orangey/src/storage/locate.ts";
   import { regrantFolder } from "../vendor/orangey/src/storage/fsdir.ts";
 
-  let view: SessionView = $state({ journals: [], currentId: null, title: "", status: "saved", problem: null, folders: [], commands: [] });
+  let view: SessionView = $state({ journals: [], currentId: null, title: "", status: "saved", problem: null, folders: [], commands: [], openFolders: [] });
   let tick = $state(0);
   let editor: Editor | null = $state(null);
   let statusEditor: Editor | null = $state(null);
@@ -576,9 +576,11 @@
             kept={keptCount}
             {copySaved}
             folders={view.folders}
+            openFolders={view.openFolders}
             {fromDisk}
             onopenfolder={openFolder}
             onfolders={setFolders}
+            onopen={(open) => session.setOpenFolders(open)}
             onroll={rollFromPanel} />
         {/snippet}
         {#snippet contents()}

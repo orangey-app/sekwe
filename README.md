@@ -82,9 +82,11 @@ come as pictures. Rolls paste as their words, without the footnotes.
   fills in what the matches share, then goes round the names; it never rolls.
 - The menu puts **recently rolled oracles first**, and moves up oracles named
   by a word you just wrote ("her motive is /npc" → NPC Motive).
-- **Folders**: in the side panel's *Oracles*, choose which Orangey folders this
-  journal rolls from; the panel lists their oracles, and a click rolls one at
-  the cursor.
+- **Folders**: the side panel's *Oracles* shows the library as a tree,
+  folders closed until you open them (each journal remembers which), with
+  Expand all / Collapse all and a filter box. Tick **Choose folders** to pick
+  which folders this journal rolls from. A click on an oracle rolls it at the
+  cursor.
 - **Picks**: a list that offers a choice shows its outcomes at the cursor;
   Enter, a click or the number keys pick one, and the chip says it was picked.
 - **Bags**: a list drawn without putting back gives each outcome once per

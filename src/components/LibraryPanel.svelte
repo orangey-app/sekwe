@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { folderPaths, inFolders, type LibraryStatus, type Oracle } from "../lib/oracles.ts";
+  import { folderPaths, type LibraryStatus, type Oracle } from "../lib/oracles.ts";
+  import { allPaths, buildTree, filterTree, isChosen, visibleOracles, type TreeFolder } from "../lib/tree.ts";
 
   let {
     status,
@@ -7,9 +8,11 @@
     kept,
     copySaved,
     folders,
+    openFolders,
     fromDisk,
     onopenfolder,
     onfolders,
+    onopen,
     onroll,
   }: {
     status: LibraryStatus;
@@ -20,43 +23,37 @@
     copySaved: string | null;
     /** The journal's chosen folders; empty means every folder. */
     folders: string[];
+    /** The folders open in the tree, kept with the journal. */
+    openFolders: string[];
     fromDisk: boolean;
     onopenfolder: () => void;
     onfolders: (folders: string[]) => void;
+    onopen: (open: string[]) => void;
     onroll: (oracle: Oracle) => void;
   } = $props();
 
-  let choosing = $state(false);
+  /** Every folder, with a box to add it to the journal's choice. */
+  let showAll = $state(false);
+  let query = $state("");
   /** Nothing from Orangey here, but the journal brought its own copy. */
   const copyOnly = $derived(oracles.length > 0 && kept === oracles.length);
   const savedOn = $derived(copySaved ? new Date(copySaved).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "");
-  const all = $derived(folderPaths(oracles));
-  const top = $derived(all.filter((f) => !f.includes("/")));
-  const shown = $derived(inFolders(oracles, folders));
 
-  /** The oracles to show, grouped by folder, folders in order and "" (the top) first. */
-  const groups = $derived.by(() => {
-    const by = new Map<string, Oracle[]>();
-    for (const o of shown) {
-      const list = by.get(o.folder) ?? [];
-      list.push(o);
-      by.set(o.folder, list);
-    }
-    return [...by.entries()]
-      .sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)))
-      .map(([folder, list]) => ({ folder, list: list.sort((a, b) => a.name.localeCompare(b.name)) }));
-  });
+  const visible = $derived(visibleOracles(oracles, folders, showAll));
+  const filtered = $derived(query.trim() ? filterTree(visible, query) : null);
+  const tree = $derived(buildTree(filtered ? filtered.oracles : visible, showAll && !filtered ? folderPaths(oracles) : []));
+  /** Open: what the journal remembers, or while filtering, whatever holds a match. */
+  const isOpen = (path: string) => (filtered ? filtered.open.has(path) : openFolders.includes(path));
 
-  let closed: Set<string> = $state(new Set());
-  function toggleGroup(folder: string) {
-    const next = new Set(closed);
-    if (next.has(folder)) next.delete(folder);
-    else next.add(folder);
-    closed = next;
+  function toggle(path: string) {
+    if (filtered) return;
+    onopen(openFolders.includes(path) ? openFolders.filter((p) => p !== path) : [...openFolders, path]);
   }
 
-  function toggleFolder(folder: string, on: boolean) {
-    onfolders(on ? [...folders, folder] : folders.filter((f) => f !== folder));
+  function pick(path: string, on: boolean) {
+    // Ticking a folder replaces any of its subfolders already chosen: the folder covers them.
+    const rest = folders.filter((f) => f !== path && !f.startsWith(`${path}/`));
+    onfolders(on ? [...rest, path] : rest);
   }
 </script>
 
@@ -84,42 +81,56 @@
       <span class="folders-now">
         {#if folders.length === 0}All folders{:else}{folders.join(", ")}{/if}
       </span>
-      <button type="button" class="link-button" aria-expanded={choosing} onclick={() => (choosing = !choosing)}>{choosing ? "Done" : "Choose folders"}</button>
+      <label class="show-all"><input type="checkbox" bind:checked={showAll} /> Choose folders</label>
     </div>
-    {#if choosing}
-      <fieldset class="folder-choice">
-        <legend>Folders this journal rolls from</legend>
-        {#if top.length === 0}
-          <p class="hint">Your library has no folders; every oracle is at the top.</p>
-        {/if}
-        {#each all as f (f)}
-          <label class="folder-option" style:padding-left="{(f.split('/').length - 1) * 1.1}rem">
-            <input type="checkbox" checked={folders.includes(f)} onchange={(ev) => toggleFolder(f, (ev.target as HTMLInputElement).checked)} />
-            {f.split("/").at(-1)}
-          </label>
-        {/each}
-        {#if folders.length}
-          <button type="button" class="link-button" onclick={() => onfolders([])}>Use every folder</button>
-        {/if}
-        <p class="hint">The journal keeps a copy of the folders you choose, so it can roll them on a computer without Orangey.</p>
-      </fieldset>
+    {#if showAll}
+      <p class="hint">Tick the folders this journal rolls from; none ticked means all of them. The journal keeps a copy of the folders you choose, so it can roll them on a computer without Orangey.{#if folders.length} <button type="button" class="link-button use-all" onclick={() => onfolders([])}>Use every folder</button>{/if}</p>
     {/if}
+    <div class="tree-tools">
+      <input class="tree-filter" type="search" placeholder="Filter oracles" aria-label="Filter oracles" bind:value={query} />
+      <button type="button" class="link-button expand-all" disabled={!!filtered} onclick={() => onopen(allPaths(tree))}>Expand all</button>
+      <button type="button" class="link-button collapse-all" disabled={!!filtered} onclick={() => onopen([])}>Collapse all</button>
+    </div>
     <p class="hint">Click an oracle to roll it at the cursor, or type <kbd>/</kbd> in the text. <kbd>Alt+R</kbd> rolls the last one again.</p>
-    <div class="oracle-tree">
-      {#each groups as g (g.folder)}
-        <div class="oracle-group">
-          {#if g.folder}
-            <button type="button" class="group-head" aria-expanded={!closed.has(g.folder)} onclick={() => toggleGroup(g.folder)}>{g.folder}</button>
-          {/if}
-          {#if !closed.has(g.folder)}
-            <ul>
-              {#each g.list as o (o.id)}
-                <li><button type="button" class="oracle-button" data-id={o.id} onmousedown={(ev) => ev.preventDefault()} onclick={() => onroll(o)}>{o.name}</button></li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {/each}
+    {#if filtered && filtered.oracles.length === 0}
+      <p class="hint">No oracle matches “{query.trim()}”.</p>
+    {/if}
+    <div class="oracle-tree" role="tree" aria-label="Oracles">
+      {@render branch(tree)}
     </div>
   {/if}
 </section>
+
+{#snippet branch(f: TreeFolder)}
+  <ul role="group">
+    {#each f.folders as sub (sub.path)}
+      {@const open = isOpen(sub.path)}
+      {@const pickState = isChosen(sub.path, folders)}
+      <li class="tree-folder" role="treeitem" aria-expanded={open} aria-selected="false">
+        <div class="folder-row">
+          {#if showAll}
+            <input
+              type="checkbox"
+              class="folder-pick"
+              aria-label="Roll from {sub.path}"
+              checked={pickState.chosen}
+              disabled={pickState.byParent}
+              onchange={(ev) => pick(sub.path, (ev.target as HTMLInputElement).checked)} />
+          {/if}
+          <button type="button" class="folder-head" data-path={sub.path} aria-expanded={open} onclick={() => toggle(sub.path)}>
+            <span class="caret" aria-hidden="true">{open ? "▾" : "▸"}</span>
+            <span class="folder-name">{sub.name}</span>
+            {#if sub.pack}<span class="pack-badge" title="{sub.pack.title} by {sub.pack.author}">pack {sub.pack.version}</span>{/if}
+            <span class="folder-count">{sub.count}</span>
+          </button>
+        </div>
+        {#if open}{@render branch(sub)}{/if}
+      </li>
+    {/each}
+    {#each f.oracles as o (o.id)}
+      <li role="treeitem" aria-selected="false">
+        <button type="button" class="oracle-button" data-id={o.id} onmousedown={(ev) => ev.preventDefault()} onclick={() => onroll(o)}>{o.name}</button>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
