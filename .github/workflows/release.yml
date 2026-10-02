@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run check && npm run typecheck && npm test
+      - run: npm run build
+      - name: Package the static site
+        run: cd dist && zip -r ../sekwe-site.zip . -x sekwe.html
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sekwe.html
+            sekwe-site.zip
+          body: |
+            Download `sekwe.html` and open it — that one file is the whole app, and it works offline.
+            Opened from disk it cannot see your Orangey library (a file on disk is a site of its own),
+            but a journal with folders chosen brings its own copy of them, and dice always work.
+            `sekwe-site.zip` is the same thing as a static site you can host yourself.
+          generate_release_notes: true

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # A wedged browser would otherwise sit at GitHub's six-hour limit.
+    timeout-minutes: 25
+    steps:
+      # Sekwe and Orangey side by side, as on your computer: browser test L
+      # rolls a wheel made in Orangey's own build, served beside Sekwe.
+      - uses: actions/checkout@v4
+        with:
+          path: sekwe
+      - uses: actions/checkout@v4
+        with:
+          repository: orangey-app/orangey
+          path: orangey
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build Orangey
+        working-directory: orangey
+        run: npm ci && npm run build:single
+      - run: npm ci
+        working-directory: sekwe
+      # Fails if anything in vendor/orangey was edited by hand.
+      - run: npm run check
+        working-directory: sekwe
+      - run: npm run typecheck
+        working-directory: sekwe
+      - run: npm test
+        working-directory: sekwe
+      # Says whether Orangey has moved on since the copy (for information; never fails the run).
+      - run: npm run sync:status || true
+        working-directory: sekwe
+      - run: npm run build
+        working-directory: sekwe
+      - name: Browser tests
+        working-directory: sekwe
+        timeout-minutes: 15
+        run: |
+          CHROME_PATH="$(which google-chrome || which chromium-browser || which chromium || true)"
+          if [ -z "$CHROME_PATH" ]; then
+            echo "No Chrome or Chromium on this runner; the browser suite needs one." >&2
+            exit 1
+          fi
+          echo "using $CHROME_PATH ($("$CHROME_PATH" --version))"
+          CHROME_PATH="$CHROME_PATH" npm run test:browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sekwe-html
+          path: sekwe/dist/sekwe.html
