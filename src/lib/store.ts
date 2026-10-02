@@ -21,6 +21,8 @@ export interface JournalStore {
   put(journal: Journal): Promise<void>;
   lastOpen(): Promise<string | null>;
   setLastOpen(id: string): Promise<void>;
+  /** Removes a journal from this browser. */
+  delete(id: string): Promise<void>;
 }
 
 export class MemoryStore implements JournalStore {
@@ -45,6 +47,9 @@ export class MemoryStore implements JournalStore {
   }
   async lastOpen(): Promise<string | null> {
     return this.#last;
+  }
+  async delete(id: string): Promise<void> {
+    this.#journals.delete(id);
   }
   async setLastOpen(id: string): Promise<void> {
     this.#last = id;
@@ -96,6 +101,16 @@ export class IndexedDbStore implements JournalStore {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error ?? new Error("write aborted"));
+    });
+  }
+
+  async delete(id: string): Promise<void> {
+    const tx = this.#tx([JOURNALS], "readwrite");
+    tx.objectStore(JOURNALS).delete(id);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error("delete aborted"));
     });
   }
 

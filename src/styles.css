@@ -812,3 +812,10 @@ mark { color: inherit; border-radius: 2px; padding: 0 0.05em; }
 .file-menu .save-label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-menu .save-label em { font-style: normal; font-weight: 600; }
 .dialog .file-name { width: 100%; font: inherit; padding: 0.35rem 0.5rem; margin: 0.25rem 0 0.75rem; }
+
+/* Commands that come from Orangey's boards. */
+.board-commands-head { font-size: 0.875rem; margin: 1.25rem 0 0.25rem; }
+
+/* Deleting a journal. */
+.menu-item.danger, button.danger { color: var(--danger, #b3261e); }
+.open-folder.danger { background: var(--danger, #b3261e); border-color: var(--danger, #b3261e); color: #fff; }

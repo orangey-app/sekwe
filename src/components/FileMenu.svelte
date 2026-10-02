@@ -16,6 +16,7 @@
     onmarkdown,
     onhtml,
     onprint,
+    ondelete,
   }: {
     journals: JournalSummary[];
     currentId: string | null;
@@ -31,6 +32,7 @@
     onmarkdown: () => void;
     onhtml: () => void;
     onprint: () => void;
+    ondelete: () => void;
   } = $props();
 
   let open = $state(false);
@@ -92,6 +94,8 @@
       </div>
 
       <button type="button" role="menuitem" class="menu-item" data-action="print" onmouseenter={() => (sub = null)} onclick={run(onprint)}><span>Print, or save as PDF</span><span class="when">{mod}P</span></button>
+      <hr />
+      <button type="button" role="menuitem" class="menu-item danger" data-action="delete" onmouseenter={() => (sub = null)} onclick={run(ondelete)}><span>Delete this journal…</span></button>
     </div>
   {/if}
 </div>

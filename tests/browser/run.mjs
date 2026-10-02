@@ -985,6 +985,42 @@ await test("Z the side panel's width is dragged by its edge, set from the keyboa
   assert.deepEqual(page.consoleErrors, []);
 });
 
+await test("P an Orangey board is a command: /tonight rolls everything on it, and it can be made the journal's own", async (page) => {
+  await openMore(page);
+  await typeText(page, "/tonig");
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item[data-kind=command]")`);
+  await press(page, "Enter");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 1`);
+  assert.equal((await chips(page))[0].source.name, "Weather");
+  await page.click("#tab-commands");
+  await page.waitForFunction(`document.querySelector(".board-commands .adopt")`);
+  assert.match(await page.evaluate(`return document.querySelector(".board-commands").textContent`), /\/tonight/);
+  await page.click(".board-commands .adopt");
+  await page.waitForFunction(`window.sekwe.session.view().commands.some((c) => c.name === "tonight")`);
+  // Now the journal's own, it is no longer listed among the boards'.
+  await page.waitForFunction(`!document.querySelector(".board-commands")`);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("V2 a journal is deleted from File, after a warning that says whether it has a file", async (page) => {
+  await open(page);
+  await typeText(page, "Keep me.");
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="new"]');
+  await page.waitForFunction(`window.sekwe.session.view().journals.length === 2`);
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="delete"]');
+  await page.waitForFunction(`document.querySelector(".dialog [data-choice=delete]")`);
+  assert.match(await page.evaluate(`return document.querySelector(".dialog").textContent`), /never been saved to a file/);
+  await page.click(".dialog [data-choice=delete]");
+  await page.waitForFunction(`window.sekwe.session.view().journals.length === 1`);
+  await page.waitForFunction(`document.querySelector(".page").textContent === "Keep me."`);
+  // After a reload it is still gone.
+  await open(page);
+  assert.equal(await page.evaluate(`return window.sekwe.session.view().journals.length`), 1);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
 // --- report -------------------------------------------------------------------
 
 await server.close();

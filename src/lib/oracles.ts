@@ -26,6 +26,17 @@ export interface Oracle {
   pack?: OraclePack;
 }
 
+/**
+ * A board from Orangey: a set of oracles rolled together. Sekwe offers each
+ * as a command (boards.ts), so it is kept apart from the oracles.
+ */
+export interface Board {
+  id: string;
+  name: string;
+  folder: string;
+  entries: { id: string; name: string }[];
+}
+
 /** An installed pack's details, as Sekwe keeps them. */
 export interface OraclePack extends PackCredit {
   id: string;
@@ -78,6 +89,10 @@ export class OracleLibrary {
   live: Oracle[] = [];
   /** The open journal's copy (copy.ts). */
   kept: Oracle[] = [];
+  /** Boards: the library's here, then the journal's copy of what the library lacks. */
+  boards: Board[] = [];
+  liveBoards: Board[] = [];
+  keptBoards: Board[] = [];
   #byId = new Map<string, Oracle>();
   #service: LibraryService | null = null;
   #locate: Locate;
@@ -140,26 +155,33 @@ export class OracleLibrary {
     if (!this.#service) return;
     await this.#service.refresh();
     const oracles: Oracle[] = [];
+    const boards: Board[] = [];
     for (const node of this.#service.files()) {
       const r = node.randomizer;
-      if (!rollable(r)) continue;
       const slash = node.path.lastIndexOf("/");
+      if (r && isBoard(r)) {
+        boards.push({ id: r.id, name: r.name, folder: slash < 0 ? "" : node.path.slice(0, slash), entries: r.entries.map((e) => ({ id: e.id, name: e.name })) });
+        continue;
+      }
+      if (!rollable(r)) continue;
       const pack = packOf(this.#service.packOf(node.path)?.pack);
       oracles.push({ id: r.id, name: r.name, folder: slash < 0 ? "" : node.path.slice(0, slash), randomizer: r, ...(pack ? { pack } : {}) });
     }
-    this.#index(oracles);
+    this.#index(oracles, boards);
     this.status = oracles.length ? "ready" : "empty";
     this.#emit();
   }
 
-  #index(live: Oracle[]): void {
+  #index(live: Oracle[], boards: Board[] = []): void {
     this.live = live;
+    this.liveBoards = boards;
     this.#merge();
   }
 
   /** The open journal's copy; the library here wins wherever both have an oracle. */
-  setKept(kept: Oracle[]): void {
+  setKept(kept: Oracle[], keptBoards: Board[] = []): void {
     this.kept = kept;
+    this.keptBoards = keptBoards;
     this.#merge();
     this.#emit();
   }
@@ -171,6 +193,8 @@ export class OracleLibrary {
     const extra = this.kept.filter((o) => !this.#byId.has(o.id));
     for (const o of extra) this.#byId.set(o.id, o);
     this.oracles = [...this.live, ...extra];
+    const liveBoardIds = new Set(this.liveBoards.map((b) => b.id));
+    this.boards = [...this.liveBoards, ...this.keptBoards.filter((b) => !liveBoardIds.has(b.id))];
   }
 
   /** How many oracles come from the journal's copy rather than the library here. */

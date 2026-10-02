@@ -179,3 +179,34 @@ describe("a writing session", () => {
     assert.equal(s.view().journals[0].id, first);
   });
 });
+
+describe("deleting a journal", () => {
+  test("the open one goes; the newest other opens; the last one leaves a fresh journal", async () => {
+    const s = setup();
+    await s.session.start();
+    const first = s.view().currentId!;
+    s.editors.type("First.");
+    await s.session.create();
+    const second = s.view().currentId!;
+    s.editors.type("Second, unsaved yet.");
+    assert.equal(await s.session.remove(second), true);
+    assert.equal(s.view().currentId, first);
+    assert.equal(await s.store.get(second), null, "the deleted journal came back with its pending save");
+    assert.deepEqual(s.view().journals.map((j) => j.id), [first]);
+    await s.session.remove(first);
+    assert.equal(s.view().journals.length, 1);
+    assert.notEqual(s.view().currentId, first);
+    assert.equal(await s.store.get(first), null);
+  });
+
+  test("deleting another journal keeps the open one open", async () => {
+    const s = setup();
+    await s.session.start();
+    const first = s.view().currentId!;
+    await s.session.create();
+    const second = s.view().currentId!;
+    await s.session.remove(first);
+    assert.equal(s.view().currentId, second);
+    assert.deepEqual(s.view().journals.map((j) => j.id), [second]);
+  });
+});

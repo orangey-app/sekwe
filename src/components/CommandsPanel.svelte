@@ -1,8 +1,22 @@
 <script lang="ts">
   import { commandName, type CommandStep, type JournalCommand } from "../lib/journal.ts";
   import { diceExpression, searchOracles, type Oracle } from "../lib/oracles.ts";
+  import type { BoardCommand } from "../lib/boards.ts";
 
-  let { commands, oracles, onchange }: { commands: JournalCommand[]; oracles: Oracle[]; onchange: (commands: JournalCommand[]) => void } = $props();
+  let {
+    commands,
+    fromBoards,
+    oracles,
+    onchange,
+    onadopt,
+  }: {
+    commands: JournalCommand[];
+    /** Orangey's boards as commands: read-only here, until made the writer's own. */
+    fromBoards: BoardCommand[];
+    oracles: Oracle[];
+    onchange: (commands: JournalCommand[]) => void;
+    onadopt: (c: BoardCommand) => void;
+  } = $props();
 
   let editing: { name: string; steps: CommandStep[]; was: string | null } | null = $state(null);
   let query = $state("");
@@ -97,5 +111,20 @@
     </form>
   {:else}
     <button type="button" class="open-folder new-command" onclick={() => start()}>New command</button>
+  {/if}
+  {#if fromBoards.length}
+    <h3 class="board-commands-head">From your Orangey boards</h3>
+    <p class="hint">Each board rolls everything on it, one chip each. They follow the board in Orangey; make one your own to change it here.</p>
+    <ul class="command-list board-commands">
+      {#each fromBoards as c (c.name)}
+        <li data-board={c.board.id}>
+          <span class="command-name">/{c.name}</span>
+          <span class="command-steps">{c.steps.map(stepLabel).join(" · ")}</span>
+          <span class="command-actions">
+            <button type="button" class="link-button adopt" onclick={() => onadopt(c)}>Make it my own</button>
+          </span>
+        </li>
+      {/each}
+    </ul>
   {/if}
 </section>

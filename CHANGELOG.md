@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Orangey's boards are commands.** Each board in the journal's folders is
+  offered in the `/` menu (`/tonights-table`) and rolls everything on it, one
+  chip each. The Commands panel lists them under "From your Orangey boards",
+  with **Make it my own** to copy one into the journal's commands; a command
+  of your own with the same name wins. The journal's copy of its folders keeps
+  their boards, so they work without Orangey too.
+- **Delete this journal…** in the File menu, after a warning that says
+  whether the journal has a file on disk (which is never touched) or this is
+  its only copy.
 - **Storyboard is now Sekwe.** The name is everywhere: the page, the
   single file (`dist/sekwe.html`), the address beside Orangey (`/sekwe/`),
   journal files (`.sekwe.json`, format `"sekwe-journal"`) and the browser's

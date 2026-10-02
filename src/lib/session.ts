@@ -279,6 +279,28 @@ export class Session {
     return this.#snapshot();
   }
 
+  /**
+   * Deletes a journal from this browser (a file on disk is never touched).
+   * The open one is saved first, so nothing it was waiting to save comes back
+   * after; then the newest other journal opens, or a fresh one when none is left.
+   */
+  async remove(id: string): Promise<boolean> {
+    if (!(await this.flush())) return false;
+    await this.#store.delete(id);
+    this.#journals = this.#journals.filter((s) => s.id !== id);
+    if (this.#current?.id !== id) {
+      this.#emit();
+      return true;
+    }
+    this.#current = null;
+    if (this.#journals.length === 0) {
+      const fresh = newJournal();
+      await this.#store.put(fresh);
+      this.#journals = [summarize(fresh)];
+    }
+    return this.open(this.#journals[0].id);
+  }
+
   /** True when a journal with this id is already here. */
   has(id: string): boolean {
     return this.#journals.some((j) => j.id === id);

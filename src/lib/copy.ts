@@ -19,7 +19,7 @@
 import { packRandomizer, unpackRandomizer } from "../../vendor/orangey/src/model/link.ts";
 import type { Rollable } from "../../vendor/orangey/src/model/randomizer.ts";
 import { refIdsOf, refsIn } from "../../vendor/orangey/src/model/refs.ts";
-import { inFolders, mayKeep, rollable, type Oracle, type OraclePack } from "./oracles.ts";
+import { inFolders, mayKeep, rollable, type Board, type Oracle, type OraclePack } from "./oracles.ts";
 
 export interface CopiedOracle {
   id: string;
@@ -37,6 +37,8 @@ export interface LibraryCopy {
   /** When the copy last changed. */
   saved: string;
   oracles: CopiedOracle[];
+  /** The chosen folders' boards, so their commands work without Orangey (boards.ts). */
+  boards?: Board[];
 }
 
 const inside = (folder: string, f: string) => folder === f || folder.startsWith(`${f}/`);
@@ -67,7 +69,13 @@ function targetsOfPacked(p: Record<string, unknown>): string[] {
  * and the copy it had. Returns `previous` itself when nothing changed, so the
  * journal is not re-saved for nothing; null when there should be no copy.
  */
-export function keepCopy(live: readonly Oracle[], folders: readonly string[], previous: LibraryCopy | null | undefined, now = new Date()): LibraryCopy | null {
+export function keepCopy(
+  live: readonly Oracle[],
+  folders: readonly string[],
+  previous: LibraryCopy | null | undefined,
+  now = new Date(),
+  liveBoards: readonly Board[] = [],
+): LibraryCopy | null {
   // Choosing no folders drops the copy (option a), but not while the library
   // here has nothing to roll: there the copy is all the journal has.
   if (folders.length === 0) return live.length || !previous ? null : previous;
@@ -91,9 +99,29 @@ export function keepCopy(live: readonly Oracle[], folders: readonly string[], pr
     if (chosen && !replaced) main.set(c.id, c);
   }
 
-  // Follow "goes to" out of the chosen folders, as far as it leads.
+  // The chosen folders' boards, by the same rule: the library's where it has the folder.
+  const boards = new Map<string, Board>();
+  if (here.length) for (const b of liveBoards) if (here.some((f) => inside(b.folder, f)) && !boards.has(b.id)) boards.set(b.id, b);
+  for (const b of previous?.boards ?? []) {
+    if (boards.has(b.id)) continue;
+    if (folders.some((f) => inside(b.folder, f)) && !here.some((f) => inside(b.folder, f))) boards.set(b.id, b);
+  }
+
+  // Follow "goes to" out of the chosen folders, as far as it leads; a board's
+  // oracles are followed the same way.
   const out = new Map(main);
   const queue = [...main.values()];
+  for (const b of boards.values()) {
+    for (const e of b.entries) {
+      if (out.has(e.id)) continue;
+      const t = liveById.get(e.id);
+      const before = prevById.get(e.id);
+      const kept = t ? copied(t, true) : before && mayKeep(before) && !inLibrary.has(e.id) ? { ...before, linked: true as const } : null;
+      if (!kept) continue;
+      out.set(e.id, kept);
+      queue.push(kept);
+    }
+  }
   while (queue.length) {
     const c = queue.shift()!;
     const l = liveById.get(c.id);
@@ -110,8 +138,10 @@ export function keepCopy(live: readonly Oracle[], folders: readonly string[], pr
   }
 
   const oracles = [...out.values()].sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-  if (previous && JSON.stringify(oracles) === JSON.stringify(sorted(prev))) return previous;
-  return { saved: now.toISOString(), oracles };
+  const boardList = [...boards.values()].sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  const same = previous && JSON.stringify(oracles) === JSON.stringify(sorted(prev)) && JSON.stringify(boardList) === JSON.stringify(previous.boards ?? []);
+  if (same) return previous!;
+  return boardList.length ? { saved: now.toISOString(), oracles, boards: boardList } : { saved: now.toISOString(), oracles };
 }
 
 const sorted = (list: readonly CopiedOracle[]) => [...list].sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
@@ -137,4 +167,9 @@ export function fromCopy(copy: LibraryCopy | null | undefined): Oracle[] {
     if (r) out.push({ id: c.id, name: c.name, folder: c.folder, randomizer: r, ...(c.linked ? { linked: true } : {}), ...(c.pack ? { pack: c.pack } : {}) });
   }
   return out;
+}
+
+/** The boards in a journal's copy. */
+export function boardsFromCopy(copy: LibraryCopy | null | undefined): Board[] {
+  return (copy?.boards ?? []).filter((b) => typeof b?.id === "string" && Array.isArray(b.entries));
 }

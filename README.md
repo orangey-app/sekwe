@@ -17,6 +17,12 @@ document.
 
 ## Trying it
 
+**Online:** <https://orangey-app.github.io/sekwe/>, beside Orangey at
+<https://orangey-app.github.io/orangey/>, so it reads the library you made
+there. Publishing is described in `docs/PUBLISHING.md`.
+
+**Locally:**
+
 ```
 npm run dev       a live page at http://localhost:5173 (no offline worker in this mode)
 npm run build     dist/ (the site, with its offline worker) and dist/sekwe.html (one file)

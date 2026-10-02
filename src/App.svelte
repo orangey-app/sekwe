@@ -14,7 +14,9 @@
   import type { SaveStatus } from "./lib/autosave.ts";
   import { diceExpression, inFolders, OracleLibrary, searchOracles, type LibraryStatus, type Oracle } from "./lib/oracles.ts";
   import { Roller } from "./lib/roller.ts";
-  import { fromCopy, keepCopy } from "./lib/copy.ts";
+  import { boardsFromCopy, fromCopy, keepCopy } from "./lib/copy.ts";
+  import { boardCommands, ownCopy, type BoardCommand } from "./lib/boards.ts";
+  import type { Board } from "./lib/oracles.ts";
   import { RollControl } from "./lib/rollnodes.ts";
   import { pickAtCursor, type SlashItem, type SlashSource } from "./lib/slash.ts";
   import { fileStem, FILE_SUFFIX, outline, toFile, toHtml, toMarkdown, type OutlineEntry } from "./lib/export.ts";
@@ -37,11 +39,30 @@
   let notice: string | null = $state(null);
   let libraryStatus: LibraryStatus = $state("idle");
   let oracleList: Oracle[] = $state([]);
+  let boardList: Board[] = $state([]);
+  /** Orangey's boards in this journal's folders, offered as commands (boards.ts). */
+  const fromBoards: BoardCommand[] = $derived(boardCommands(boardList, view.folders, view.commands));
   /** How many of those come from the journal's copy, and when it was saved. */
   let keptCount = $state(0);
   let copySaved: string | null = $state(null);
   let outlineEntries: OutlineEntry[] = $state([]);
   let duplicate: { raw: unknown; title: string; handle?: FileHandle } | null = $state(null);
+  /** Asking before a journal is deleted: its title, and the file it has on disk, if any. */
+  let deleting: { id: string; title: string; file: string | null } | null = $state(null);
+  function askDelete() {
+    const id = view.currentId;
+    if (id) deleting = { id, title: view.title || "Untitled journal", file: currentFile };
+  }
+  async function confirmDelete() {
+    const d = deleting;
+    deleting = null;
+    if (!d) return;
+    if (await session.remove(d.id)) {
+      await forgetFile(d.id);
+      await refreshFile();
+      say(`“${d.title}” was deleted from this browser.`);
+    }
+  }
   /** The file the open journal belongs to (Chrome, Edge), for the File menu. */
   let currentFile: string | null = $state(null);
   /** Save as without a file picker: the name being asked for. */
@@ -130,6 +151,7 @@
   library.onChange(() => {
     libraryStatus = library.status;
     oracleList = library.oracles;
+    boardList = library.boards;
     keptCount = library.fromCopy;
     if (library.live !== lastLive) {
       lastLive = library.live;
@@ -144,10 +166,10 @@
    */
   function syncCopy() {
     if (!session?.view().currentId) return;
-    const next = keepCopy(library.live, session.view().folders, session.copy);
+    const next = keepCopy(library.live, session.view().folders, session.copy, new Date(), library.liveBoards);
     session.setCopy(next);
     copySaved = next?.saved ?? null;
-    library.setKept(fromCopy(next));
+    library.setKept(fromCopy(next), boardsFromCopy(next));
   }
   let lastJournalKey = "";
   function onView(v: SessionView) {
@@ -193,7 +215,7 @@
     items(query: string, e: Editor): SlashItem[] {
       const out: SlashItem[] = [];
       const q = query.trim().toLowerCase();
-      for (const c of session.view().commands) {
+      for (const c of [...session.view().commands, ...boardCommands(library.boards, session.view().folders, session.view().commands)]) {
         if (q && c.name.startsWith(q.split(" ")[0])) out.push({ kind: "command", name: c.name, count: c.steps.length });
       }
       const dice = diceExpression(query);
@@ -228,7 +250,7 @@
 
   /** A journal's own command: every roll it lists, one chip each, in order. */
   async function runCommand(e: Editor, name: string, range: Range) {
-    const command = session.view().commands.find((c) => c.name === name);
+    const command = [...session.view().commands, ...boardCommands(library.boards, session.view().folders, session.view().commands)].find((c) => c.name === name);
     e.chain().focus().deleteRange(range).run();
     if (!command) return;
     const records: RollRecord[] = [];
@@ -474,7 +496,8 @@
       onsaveas={() => saveToFile(true)}
       onmarkdown={() => exportAs("markdown")}
       onhtml={() => exportAs("html")}
-      onprint={print} />
+      onprint={print}
+      ondelete={askDelete} />
     <input
       class="title"
       bind:this={titleInput}
@@ -546,7 +569,12 @@
           <ContentsPanel entries={outlineEntries} onjump={jump} />
         {/snippet}
         {#snippet commands()}
-          <CommandsPanel commands={view.commands} oracles={inFolders(oracleList, view.folders)} onchange={setCommands} />
+          <CommandsPanel
+            commands={view.commands}
+            {fromBoards}
+            oracles={inFolders(oracleList, view.folders)}
+            onchange={setCommands}
+            onadopt={(c) => setCommands([...view.commands, ownCopy(c)].sort((a, b) => a.name.localeCompare(b.name)))} />
         {/snippet}
       </SidePanel>
     </aside>
@@ -563,6 +591,23 @@
           <button type="button" class="open-folder" data-choice="replace" onclick={() => resolveDuplicate("replace")}>Replace it</button>
           <button type="button" class="open-folder" data-choice="copy" onclick={() => resolveDuplicate("copy")}>Keep both</button>
           <button type="button" class="link-button" data-choice="cancel" onclick={() => resolveDuplicate(null)}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if deleting}
+    <div class="dialog-backdrop">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="del-title">
+        <h2 id="del-title">Delete “{deleting.title}”?</h2>
+        {#if deleting.file}
+          <p>It goes from this browser. Its file, <strong>{deleting.file}</strong>, stays on your computer, and you can open it again with File ▸ Open.</p>
+        {:else}
+          <p>It has never been saved to a file, so this is the only copy: once deleted, it is gone. To keep a copy, cancel and use File ▸ Save as… first.</p>
+        {/if}
+        <div class="form-actions">
+          <button type="button" class="open-folder danger" data-choice="delete" onclick={confirmDelete}>Delete</button>
+          <button type="button" class="link-button" data-choice="cancel" onclick={() => (deleting = null)}>Cancel</button>
         </div>
       </div>
     </div>
