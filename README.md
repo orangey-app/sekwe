@@ -5,9 +5,10 @@ an answer, an oracle from [Orangey](https://github.com/orangey-app/orangey)
 rolls straight into the text at the cursor. No page switching, no server, no
 account, and it works offline.
 
-**Status:** journals, formatting, autosave and offline work, and oracles from
-your Orangey library roll into the text (`/` and a name, Alt+R, Alt+N). Picks,
-bags, the shelf and the chip's full menu come next. `docs/STATUS.md` says where the work
+**Status:** journals with chapters, a status panel, tables and text styling;
+oracles from your Orangey library roll into the text and the status panel;
+journals save to files and export as Markdown, a web page or PDF. Works
+offline. `docs/STATUS.md` says what is next. `docs/STATUS.md` says where the work
 stands; the plan and the decisions behind it are in the project's plan
 document.
 
@@ -24,26 +25,82 @@ Storyboard reads the Orangey library of the site it is served from: browsers
 keep each site's storage apart, so it only sees a library made in Orangey at
 the same address. That is what `serve:both` is for when trying it locally.
 
+## Writing
+
+- **The page**: Narrow, Wide or Full (the menu beside the title).
+- **Chapter, Scene and Beat** headings; the side panel's *Contents* lists them,
+  and a click jumps there. Printing starts each chapter on a new page.
+- **Highlight, text colour, size and typeface** from the toolbar, from fixed
+  choices so a journal stays readable and exports cleanly.
+- **Tables** from the toolbar, in the story or the status panel. Tab moves
+  between cells (and adds a row at the end); the toolbar adds and removes rows
+  and columns while you are in one.
+- **The status panel** (side panel, *Status*) is a second page per journal for
+  health, supplies, threads: always beside the story. Rolls work there too.
+
+## Files
+
+The *File* menu works like a word processor's: **New journal**; **Open**, with
+your recent journals and **Browse for a journal file…** (Ctrl+O; a journal
+already here can be replaced or kept beside the copy); **Save to a file**
+(Ctrl+Shift+S; in Chrome and Edge, later saves go to the same file) and
+**Save as…**; **Export** as Markdown or a web page; and **Print, or save as
+PDF** (Ctrl+P).
+
+The journal you write in is kept in this browser and saved as you type; a
+saved file is a portable copy and your backup. Clearing the site's data, or
+moving to another browser, loses whatever was not saved to a file. Exports put each roll's
+words in the text with a footnote naming its oracle and earlier results, and
+add the status panel at the end. A journal file holds the copies of the
+oracles it rolled, so it re-rolls on any computer.
+
 ## Rolling
 
 - **`/` and part of a name** (`/npc mot`) rolls an oracle into the text;
-  `/2d6` rolls dice. Arrow keys choose, Enter rolls, Escape closes.
+  `/2d6` rolls dice. Arrow keys choose, Enter rolls, Escape closes. **Tab**
+  fills in what the matches share, then goes round the names; it never rolls.
+- The menu puts **recently rolled oracles first**, and moves up oracles named
+  by a word you just wrote ("her motive is /npc" → NPC Motive).
+- **Folders**: in the side panel's *Oracles*, choose which Orangey folders this
+  journal rolls from; the panel lists their oracles, and a click rolls one at
+  the cursor.
+- **Picks**: a list that offers a choice shows its outcomes at the cursor;
+  Enter, a click or the number keys pick one, and the chip says it was picked.
+- **Bags**: a list drawn without putting back gives each outcome once per
+  journal, and refills itself (with a note) when it has given everything.
+- **Commands** (side panel, *Commands*): `/feeling` can roll several oracles
+  and dice at once, one chip each. Each journal has its own.
 - **Alt+R** rolls the last oracle again at the cursor; with a chip selected
   (click it), it re-rolls that chip, keeping the earlier results.
 - **Alt+N** follows an outcome that goes to another oracle (the chip shows
   "→ name"). It never rolls by itself.
 - An **inkblot** lands as a small blot; click it and choose *Put in the text*
   for the full picture below the paragraph.
+- Click any chip for its pop-up: roll again, follow its chain, earlier
+  results, and **Turn into text**.
+- **Tables inside tables**: an outcome made in Orangey as "A {@Weather}
+  morning" rolls Weather into the chip ("A foggy morning"); the chip's pop-up
+  says which table gave what.
+- **Packs**: a roll from a pack installed in Orangey shows its credit
+  ("From Delve Oracles by A. Writer · v1.2 · CC BY 4.0") on the chip's pop-up,
+  and every pack used is credited once at the end of an export.
 - Every oracle rolled is copied into the journal, so a journal re-rolls
-  offline, on another computer, or after the wheel is deleted. A wheel edited
+  offline, on another computer, or after the wheel is deleted (unless its
+  pack's author asks apps not to keep copies; then re-rolling needs the pack).
+- **A journal with folders chosen keeps a copy of them**, with whatever their
+  outcomes go to or refer to, so on a computer without Orangey (the journal
+  file on a USB stick, opened in `storyboard.html` from disk) you can still
+  roll them from the slash menu and the panel. Where Orangey's library is
+  present it wins, and the copy is refreshed from it; a folder this computer's
+  library does not have is kept as it was. With no folders chosen, nothing
+  extra is copied. A wheel edited
   in Orangey rolls as edited from the next roll (Storyboard reads the library
   again whenever its tab comes back); what is already in the text never changes.
 
 `dist/storyboard.html` also opens straight from disk: double-click it.
 
 Journals are kept in this browser (IndexedDB, database `storyboard`) and saved
-half a second after you stop typing; Ctrl+S saves at once. Opening and saving
-journal files comes in a later stage.
+half a second after you stop typing; Ctrl+S saves at once.
 
 ## How it relates to Orangey
 

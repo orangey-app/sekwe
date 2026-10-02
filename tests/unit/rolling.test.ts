@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { SeededSource } from "../../vendor/orangey/src/core/rng.ts";
 import type { ListRandomizer, Rollable } from "../../vendor/orangey/src/model/randomizer.ts";
 import { MemoryBackend } from "../../vendor/orangey/src/storage/memory.ts";
-import { diceExpression, OracleLibrary, searchOracles, versionOf, type Oracle } from "../../src/lib/oracles.ts";
+import { diceExpression, folderPaths, inFolders, OracleLibrary, searchOracles, sharedPrefix, versionOf, type Oracle } from "../../src/lib/oracles.ts";
 import { Roller, snapshotKey, type Snapshots } from "../../src/lib/roller.ts";
 import { chipText, current } from "../../src/lib/rolls.ts";
 
@@ -197,5 +197,70 @@ describe("the Orangey library, read where Orangey keeps it", () => {
     const lib = new OracleLibrary(async () => ({ backend: null, folder: null }), async () => null);
     await lib.load();
     assert.equal(lib.status, "unavailable");
+  });
+});
+
+describe("picks, bags, folders, recent oracles and Tab", () => {
+  const offer = list("o", "Ask the Oracle", ["Yes", "No", "Maybe", "Twist"], { offer: 3 });
+  const deck = list("d", "Deck", ["Ace", "King", "Queen"], { withoutReplacement: true });
+
+  test("a list that offers a choice deals that many outcomes, and the pick lands, marked as picked", () => {
+    const library = OracleLibrary.of([oracle(offer)]);
+    const roller = new Roller(library, () => memorySnapshots(), () => new SeededSource("p"));
+    const begun = roller.start("o");
+    assert.equal(begun.kind, "pick");
+    if (begun.kind !== "pick") return;
+    assert.equal(begun.choices.length, 3);
+    assert.equal(new Set(begun.choices).size, 3, "an offer repeated an outcome");
+    const record = begun.finish(2);
+    assert.equal(current(record).text, begun.choices[2]);
+    assert.equal(current(record).picked, true);
+    assert.match(current(record).detail ?? "", /^chosen from /);
+  });
+
+  test("a bag gives each outcome once, refills when empty, and its state is the journal's", () => {
+    const { memoryBags } = { memoryBags: () => { const all: Record<string, string[]> = {}; return { all, get: (id: string) => all[id] ?? [], set: (id: string, l: string[]) => void (all[id] = l) }; } };
+    const bags = memoryBags();
+    let refills = 0;
+    const roller = new Roller(OracleLibrary.of([oracle(deck)]), () => memorySnapshots(), () => new SeededSource("b"), () => new Date(), () => bags);
+    roller.onRefill = () => refills++;
+    const three = [0, 1, 2].map(() => current(roller.oracle("d")!).text);
+    assert.deepEqual([...three].sort(), ["Ace", "King", "Queen"], "the bag repeated itself");
+    assert.deepEqual([...bags.all.d].sort(), ["Ace", "King", "Queen"]);
+    const fourth = current(roller.oracle("d")!).text;
+    assert.equal(refills, 1);
+    assert.deepEqual(bags.all.d, [fourth]);
+  });
+
+  test("re-rolling a bag's chip puts its old answer back first", () => {
+    const bags = { all: {} as Record<string, string[]>, get(id: string) { return this.all[id] ?? []; }, set(id: string, l: string[]) { this.all[id] = l; } };
+    const roller = new Roller(OracleLibrary.of([oracle(deck)]), () => memorySnapshots(), () => new SeededSource("r"), () => new Date(), () => bags);
+    const record = roller.oracle("d")!;
+    const again = roller.reroll(record)!;
+    assert.equal(bags.all.d.length, 1, "the old answer stayed out of the bag");
+    assert.equal(bags.all.d[0], current(again).text);
+  });
+
+  test("a journal's folders narrow what can be rolled, subfolders included", () => {
+    const all = [oracle(list("a", "A", ["x"]), "Starforged/Core"), oracle(list("b", "B", ["x"]), "Starforged"), oracle(list("c", "C", ["x"]), "Dungeon"), oracle(list("d", "D", ["x"]), "")];
+    assert.deepEqual(inFolders(all, ["Starforged"]).map((o) => o.id), ["a", "b"]);
+    assert.deepEqual(inFolders(all, []).map((o) => o.id), ["a", "b", "c", "d"]);
+    assert.deepEqual(folderPaths(all), ["Dungeon", "Starforged", "Starforged/Core"]);
+  });
+
+  test("recent oracles and words just written move an oracle up, but never add one", () => {
+    const all = [oracle(list("n", "NPC Name", ["x"])), oracle(list("r", "NPC Role", ["x"])), oracle(list("w", "Weather", ["x"]))];
+    assert.equal(searchOracles(all, "npc")[0].oracle.name, "NPC Name");
+    assert.equal(searchOracles(all, "npc", 8, { recent: ["r"] })[0].oracle.name, "NPC Role");
+    assert.equal(searchOracles(all, "npc", 8, { context: "A stranger walks in; her role is unclear" })[0].oracle.name, "NPC Role");
+    assert.equal(searchOracles(all, "", 8, { context: "the weather turns" })[0].oracle.name, "Weather");
+    assert.deepEqual(searchOracles(all, "npc", 8, { recent: ["w"] }).map((m) => m.oracle.name).includes("Weather"), false);
+  });
+
+  test("Tab fills in what every match shares", () => {
+    assert.equal(sharedPrefix(["NPC Name", "NPC Role", "NPC Motive"]), "NPC ");
+    assert.equal(sharedPrefix(["Weather"]), "Weather");
+    assert.equal(sharedPrefix(["Alpha", "beta"]), "");
+    assert.equal(sharedPrefix([]), "");
   });
 });

@@ -3,6 +3,7 @@
   import type { ChipAt, RollControl } from "../lib/rollnodes.ts";
   import { chipText, current } from "../lib/rolls.ts";
   import { drawBlot } from "../lib/blot.ts";
+  import { creditText } from "../lib/export.ts";
 
   // Shown while the selection is on a chip; `tick` changes with every editor transaction.
   let { editor, control, tick }: { editor: Editor | null; control: RollControl; tick: number } = $props();
@@ -42,7 +43,14 @@
       {source.kind === "dice" ? source.expression : source.name}
       {#if r.detail}<span class="detail">{r.detail}</span>{/if}
       {#if r.rolled?.length}<span class="detail">{r.rolled.join(" · ")}</span>{/if}
+      {#if r.parts?.length}<span class="detail parts">{r.parts.map((p) => `${p.name}: ${p.text}`).join(" · ")}</span>{/if}
     </p>
+    {#if source.kind === "oracle" && source.pack}
+      <p class="credit">
+        From {creditText(source.pack)}
+        {#if source.pack.homepage && /^https?:\/\//i.test(source.pack.homepage)}· <a href={source.pack.homepage} target="_blank" rel="noopener">web page</a>{/if}
+      </p>
+    {/if}
     {#if r.blot !== undefined}
       <canvas class="blot-preview" bind:this={preview} role="img" aria-label={chipText(r)}></canvas>
     {/if}
@@ -54,6 +62,7 @@
       {#if r.blot !== undefined}
         <button type="button" class="put" onclick={() => editor && control.putPicture(editor, at)}>Put in the text</button>
       {/if}
+      <button type="button" class="to-text" title="Keep the words and stop it being a roll" onclick={() => editor && control.toText(editor, at)}>Turn into text</button>
     </div>
     {#if at.record.results.length > 1}
       <ol class="history" reversed aria-label="Earlier results">

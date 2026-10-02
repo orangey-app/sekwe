@@ -6,6 +6,8 @@
  * comes in a later stage and will wrap this, under its own format name.
  */
 
+import type { LibraryCopy } from "./copy.ts";
+
 export const JOURNAL_FORMAT = "storyboard-journal";
 export const JOURNAL_FORMAT_VERSION = 1;
 export const TITLE_MAX = 120;
@@ -31,6 +33,39 @@ export interface Journal {
    * "<oracle id>@<version>" (see roller.ts), so it re-rolls without the library.
    */
   oracles?: Record<string, Record<string, unknown>>;
+  /** The side panel's notes: inventory, health, anything the writer keeps track of. */
+  status?: DocJSON;
+  /** Orangey folders this journal rolls from ("Starforged"); none or empty means all of them. */
+  folders?: string[];
+  /** The journal's own commands: "/feeling" rolls several things at once. */
+  commands?: JournalCommand[];
+  /** What each bag has given out in this journal, by oracle id, as outcome labels. */
+  bags?: Record<string, string[]>;
+  /** Oracle ids, most recently rolled first: they come first in the slash menu. */
+  recent?: string[];
+  /**
+   * A copy of the chosen folders (and what they lead to), so the journal rolls
+   * on a computer without Orangey. Only kept when folders are chosen (copy.ts).
+   */
+  copy?: LibraryCopy;
+}
+
+/** One step of a command: an oracle (by id, with its name for display) or dice. */
+export type CommandStep = { kind: "oracle"; id: string; name: string } | { kind: "dice"; expression: string };
+
+export interface JournalCommand {
+  /** Without the slash: "feeling". Letters, digits, - and _. */
+  name: string;
+  steps: CommandStep[];
+}
+
+export const COMMAND_NAME = /^[\p{L}\p{N}_-]{1,32}$/u;
+export const RECENT_MAX = 20;
+
+/** "/Feeling " → "feeling"; null when it cannot be a command name. */
+export function commandName(raw: string): string | null {
+  const name = raw.trim().replace(/^\//, "").toLowerCase();
+  return COMMAND_NAME.test(name) ? name : null;
 }
 
 /** What the journal menu needs, without carrying every document around. */

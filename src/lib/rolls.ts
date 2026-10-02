@@ -10,6 +10,15 @@ import { rollRandomizer, type Outcome } from "../../vendor/orangey/src/model/rol
 import type { RandomSource } from "../../vendor/orangey/src/core/rng.ts";
 import type { DiceRandomizer, Rollable } from "../../vendor/orangey/src/model/randomizer.ts";
 
+/** Who made an oracle's pack, as its credit needs it (Orangey's PackManifest, in part). */
+export interface PackCredit {
+  title: string;
+  author: string;
+  version: string;
+  licence?: string;
+  homepage?: string;
+}
+
 export type RollSource =
   | {
       kind: "oracle";
@@ -18,6 +27,8 @@ export type RollSource =
       name: string;
       /** versionOf() the randomizer this result came from; with id, names its snapshot. */
       version: string;
+      /** The pack it belongs to, for its credit: in the chip's pop-up and in exports. */
+      pack?: PackCredit;
     }
   | { kind: "dice"; expression: string };
 
@@ -32,6 +43,10 @@ export interface RollResult {
   blot?: number;
   /** An outcome that "goes to" another oracle: the next roll to offer. */
   next?: { id: string; name: string; version?: string };
+  /** Chosen by the writer from an offer, not rolled; `detail` says what else was offered. */
+  picked?: true;
+  /** The tables its text referred to (`{@Weather}`), and what each gave. */
+  parts?: { name: string; text: string }[];
   at: string;
 }
 
@@ -52,7 +67,13 @@ export function resultFrom(o: Outcome, r: Rollable, findName: (id: string) => st
   const result: RollResult = { text: o.text, at: now.toISOString() };
   if (o.kind === "inkblot" && o.blot !== undefined) result.blot = o.blot;
   if (o.detail && o.kind !== "list") result.detail = o.detail;
+  if (o.picked || o.offered) {
+    result.picked = true;
+    const note = o.detail?.split(" · ").find((p) => p.startsWith("chosen from"));
+    if (note) result.detail = note;
+  }
   if (o.rolled?.length) result.rolled = o.rolled;
+  if (o.parts?.length) result.parts = o.parts.map((p) => ({ name: p.name, text: p.text }));
   if (r.type === "list" && o.itemIndex !== undefined) {
     const target = r.items[o.itemIndex]?.goesTo;
     if (target) result.next = { id: target, name: findName(target) ?? "another oracle" };

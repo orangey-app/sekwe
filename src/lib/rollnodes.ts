@@ -15,7 +15,7 @@ import { Extension, Node, mergeAttributes, type Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { drawBlot, drawBlotNow } from "./blot.ts";
-import type { Roller } from "./roller.ts";
+import type { Begun, Roller } from "./roller.ts";
 import { chipText, current, type RollRecord, type RollSource } from "./rolls.ts";
 
 const THUMB_WIDTH = 40;
@@ -203,6 +203,10 @@ export interface RollControlOptions {
   roller: () => Roller;
   /** Says something to the writer: an oracle that has gone, nothing to roll again. */
   notice: (message: string) => void;
+  /** Asks the writer to pick from an offer; the app shows the list at the cursor. */
+  pick?: (editor: Editor, name: string, choices: string[]) => Promise<number | null>;
+  /** Told of every oracle rolled, so the slash menu can put it first next time. */
+  used?: (id: string) => void;
 }
 
 /** A chip and where it is. */
@@ -240,22 +244,59 @@ export class RollControl {
     return found;
   }
 
+  /** A roll that may need a pick first; null when cancelled or not found. */
+  async settle(editor: Editor, begun: Begun): Promise<RollRecord | null> {
+    if (begun.kind === "missing") {
+      this.#o.notice(`"${begun.name}" is no longer in your library, and this journal has no copy of it.`);
+      return null;
+    }
+    if (begun.kind === "done") return begun.record;
+    const index = this.#o.pick ? await this.#o.pick(editor, begun.name, begun.choices) : 0;
+    return index === null ? null : begun.finish(index);
+  }
+
+  #remember(record: RollRecord): void {
+    this.last = record.source;
+    if (record.source.kind === "oracle") this.#o.used?.(record.source.id);
+  }
+
   /** Puts a roll at the cursor (or over `range`, e.g. the typed "/query"). */
   insert(editor: Editor, record: RollRecord, range?: { from: number; to: number }): boolean {
-    this.last = record.source;
+    return this.insertMany(editor, [record], range);
+  }
+
+  /** Several rolls at once, a space between each, so each still re-rolls on its own. */
+  insertMany(editor: Editor, records: RollRecord[], range?: { from: number; to: number }): boolean {
+    if (records.length === 0) return false;
+    for (const r of records) this.#remember(r);
+    const content: object[] = [];
+    records.forEach((record, i) => {
+      if (i) content.push({ type: "text", text: " " });
+      content.push({ type: "roll", attrs: { record } });
+    });
     const chain = editor.chain().focus();
-    const content = { type: "roll", attrs: { record } };
     return (range ? chain.insertContentAt(range, content) : chain.insertContent(content)).run();
   }
 
-  /** Re-rolls a chip in place, keeping its history and the selection on it. */
-  rerollAt(editor: Editor, at: ChipAt): boolean {
-    const record = this.#o.roller().reroll(at.record);
-    if (!record) {
-      this.#o.notice(`"${at.record.source.kind === "oracle" ? at.record.source.name : "That roll"}" is no longer in your library, and this journal has no copy of it.`);
-      return true;
+  /** Rolls an oracle at the cursor (or over `range`), asking for a pick when it offers one. */
+  async rollOracle(editor: Editor, id: string, name: string, range?: { from: number; to: number }): Promise<boolean> {
+    // The typed "/query" goes first, so a pick list sits where the text will.
+    if (range) {
+      editor.chain().focus().deleteRange(range).run();
+      range = undefined;
     }
-    this.last = record.source;
+    const record = await this.settle(editor, this.#o.roller().start(id, undefined, name));
+    return record ? this.insert(editor, record) : false;
+  }
+
+  /** Re-rolls a chip in place, keeping its history and the selection on it. */
+  async rerollAt(editor: Editor, at: ChipAt): Promise<boolean> {
+    const record = await this.settle(editor, this.#o.roller().startReroll(at.record));
+    if (!record) return true;
+    // The chip may have moved while a pick was open; find it again.
+    const node = editor.state.doc.nodeAt(at.pos);
+    if (!node || node.type.name !== "roll") return true;
+    this.#remember(record);
     const { tr } = editor.state;
     tr.setNodeMarkup(at.pos, undefined, { record });
     tr.setSelection(NodeSelection.create(tr.doc, at.pos));
@@ -266,19 +307,18 @@ export class RollControl {
   /** Alt+R: the selected chip again, or else the last oracle rolled, at the cursor. */
   rollAgain(editor: Editor): boolean {
     const chip = this.selectedChip(editor);
-    if (chip) return this.rerollAt(editor, chip);
+    if (chip) {
+      void this.rerollAt(editor, chip);
+      return true;
+    }
     const last = this.last;
     if (!last) {
       this.#o.notice("Nothing rolled yet: type / to roll an oracle.");
       return true;
     }
-    const roller = this.#o.roller();
-    const record = last.kind === "dice" ? roller.dice(last.expression) : roller.oracle(last.id, last.version);
-    if (!record) {
-      this.#o.notice(`"${last.kind === "oracle" ? last.name : last.expression}" can no longer be found.`);
-      return true;
-    }
-    return this.insert(editor, record);
+    if (last.kind === "dice") return this.insert(editor, this.#o.roller().dice(last.expression));
+    void this.settle(editor, this.#o.roller().start(last.id, last.version, last.name)).then((r) => r && this.insert(editor, r));
+    return true;
   }
 
   /**
@@ -293,17 +333,14 @@ export class RollControl {
       this.#o.notice("This roll does not lead to another oracle.");
       return true;
     }
-    const record = this.#o.roller().next(from.record);
-    if (!record) {
-      this.#o.notice(`"${current(from.record).next!.name}" can no longer be found.`);
-      return true;
-    }
-    if (selected) {
-      const after = selected.pos + 1;
-      this.last = record.source;
-      return editor.chain().focus().insertContentAt(after, [{ type: "text", text: " " }, { type: "roll", attrs: { record } }]).run();
-    }
-    return this.insert(editor, record);
+    void this.settle(editor, this.#o.roller().startNext(from.record)).then((record) => {
+      if (!record) return;
+      if (selected) {
+        this.#remember(record);
+        editor.chain().focus().insertContentAt(selected.pos + 1, [{ type: "text", text: " " }, { type: "roll", attrs: { record } }]).run();
+      } else this.insert(editor, record);
+    });
+    return true;
   }
 
   /** "Put in the text": the blot as a picture below the paragraph holding the chip. */
@@ -314,6 +351,12 @@ export class RollControl {
     const after = $pos.after($pos.depth);
     const from = at.record.source.kind === "oracle" ? at.record.source.name : "";
     return editor.chain().insertContentAt(after, { type: "inkblot", attrs: { blot: r.blot, from } }).run();
+  }
+
+  /** "Turn into text": the chip becomes its words, and stops being a roll. */
+  toText(editor: Editor, at: ChipAt): boolean {
+    const text = chipText(current(at.record));
+    return editor.chain().focus().insertContentAt({ from: at.pos, to: at.pos + 1 }, text).run();
   }
 }
 

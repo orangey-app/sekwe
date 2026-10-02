@@ -6,18 +6,30 @@ import { UNTITLED, type DocJSON } from "../../src/lib/journal.ts";
 
 /** An editor stand-in: holds a document, and "typing" replaces its text. */
 function fakeEditors() {
-  const live: { doc: DocJSON; onChange: () => void; destroyed: boolean }[] = [];
-  const make: MakeEditor = (doc, onChange) => {
-    const e = { doc: structuredClone(doc), onChange, destroyed: false };
-    live.push(e);
+  type Fake = { doc: DocJSON; onChange: () => void; destroyed: boolean };
+  const all: (Fake & { role: string })[] = [];
+  const make: MakeEditor = (doc, onChange, role) => {
+    const e = { doc: structuredClone(doc), onChange, destroyed: false, role };
+    all.push(e);
     return { getJSON: () => structuredClone(e.doc), destroy: () => void (e.destroyed = true) } as ReturnType<MakeEditor>;
   };
-  const type = (text: string) => {
-    const e = live[live.length - 1];
+  const write = (role: string) => (text: string) => {
+    const e = all.filter((x) => x.role === role).at(-1)!;
     e.doc = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] };
     e.onChange();
   };
-  return { make, type, live };
+  // `live`: the story editors, in the order they were made.
+  return {
+    make,
+    type: write("story"),
+    note: write("status"),
+    get live() {
+      return all.filter((x) => x.role === "story");
+    },
+    get statusLive() {
+      return all.filter((x) => x.role === "status");
+    },
+  };
 }
 
 const textOf = (doc: DocJSON | undefined) => JSON.stringify(doc).match(/"text":"([^"]*)"/)?.[1];
@@ -86,6 +98,74 @@ describe("a writing session", () => {
     assert.equal(s.editors.live.length, 1, "a new editor was made");
     assert.match(s.view().problem!, /Could not save/);
     assert.equal(textOf(s.editors.live[0].doc), "unsaved words");
+  });
+
+  test("the status panel is saved with its journal, and each journal has its own", async () => {
+    const s = setup();
+    await s.session.start();
+    s.editors.note("HP 12 · Supplies 3");
+    await s.session.create();
+    s.editors.note("A different campaign");
+    await s.session.flush();
+    const again = setup(s.store);
+    await again.session.start();
+    assert.equal(textOf(again.editors.statusLive[0].doc), "A different campaign");
+    const first = again.view().journals.find((j) => j.id !== again.view().currentId)!;
+    assert.equal(textOf((await s.store.get(first.id))!.status), "HP 12 · Supplies 3");
+  });
+
+  test("folders, commands, bags and recent oracles are the journal's own, and saved with it", async () => {
+    const s = setup();
+    await s.session.start();
+    s.session.setFolders(["Starforged", "Starforged", "Dungeon"]);
+    s.session.setCommands([{ name: "feeling", steps: [{ kind: "dice", expression: "2d6" }] }]);
+    s.session.bags.set("deck", ["Ace"]);
+    s.session.noteUsed("a");
+    s.session.noteUsed("b");
+    s.session.noteUsed("a");
+    await s.session.flush();
+    const j = (await s.store.get(s.view().currentId!))!;
+    assert.deepEqual(j.folders, ["Dungeon", "Starforged"]);
+    assert.equal(j.commands?.[0].name, "feeling");
+    assert.deepEqual(j.bags, { deck: ["Ace"] });
+    assert.deepEqual(j.recent, ["a", "b"]);
+    await s.session.create();
+    assert.deepEqual(s.view().folders, [], "a new journal inherited the folders");
+    assert.deepEqual(s.session.bags.get("deck"), []);
+  });
+
+  test("the copy of the folders is saved with its journal; the same copy again saves nothing", async () => {
+    const s = setup();
+    await s.session.start();
+    const copy = { saved: "2026-10-01T10:00:00.000Z", oracles: [{ id: "sky", name: "Sky", folder: "Weather", packed: { type: "list", name: "Sky", view: "wheel", items: [{ label: "Clear", weight: 1 }] } }] };
+    s.session.setCopy(copy);
+    await s.session.flush();
+    const id = s.view().currentId!;
+    const j = (await s.store.get(id))!;
+    assert.deepEqual(j.copy, copy);
+    s.session.setCopy(s.session.copy);
+    assert.equal(s.session.dirty, false, "setting the same copy again counted as a change");
+    s.session.setCopy(null);
+    await s.session.flush();
+    assert.equal((await s.store.get(id))!.copy, undefined);
+  });
+
+  test("a journal file opens as a copy beside the one already here, or replaces it", async () => {
+    const s = setup();
+    await s.session.start();
+    s.editors.type("original");
+    const file = (await s.session.current())!;
+    file.doc = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "from the file" }] }] };
+    assert.equal(await s.session.importJournal(file, "copy"), true);
+    assert.equal(s.view().journals.length, 2);
+    assert.equal(s.view().title, `${UNTITLED} 2`);
+    assert.notEqual(s.view().currentId, file.id);
+    assert.equal(await s.session.importJournal(file, "replace"), true);
+    assert.equal(s.view().journals.length, 2);
+    assert.equal(s.view().currentId, file.id);
+    assert.equal(textOf(s.editors.live.at(-1)!.doc), "from the file");
+    assert.equal(await s.session.importJournal({ hello: "world" }), false);
+    assert.match(s.view().problem!, /not a Storyboard journal/);
   });
 
   test("the menu lists the journal just saved first", async () => {

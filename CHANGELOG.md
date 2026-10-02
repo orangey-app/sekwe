@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- **A journal keeps a copy of its folders.** With folders chosen, the journal
+  holds those folders' oracles (and what they go to or refer to), so it rolls
+  on a computer without Orangey: save it to a file, open it in
+  `storyboard.html` from disk, and the slash menu and panel still work. The
+  library here wins and refreshes the copy; with no folders chosen, nothing
+  extra is copied. The panel says when it is rolling from the copy.
+- **Pack credit.** Rolls from a pack installed in Orangey carry its credit,
+  shown on the chip's pop-up and once per pack at the end of a Markdown or
+  web page export. A pack whose author asks for no copies in journals is left
+  out of the journal's copy and its snapshots.
+- **Tables inside tables.** Orangey outcomes like "A {@Weather} morning" roll
+  the table they name into the chip; the pop-up and the export's footnote say
+  which table gave what. The tables referred to are kept with the journal too.
+- **A wider page, your choice of width**: Narrow, Wide (the new default,
+  about 92 characters) or Full.
+- **Tab completes in the slash menu**, as at a command prompt: what the
+  matches share first, then each whole name in turn. Only Enter rolls.
+- **Folders per journal.** Choose which Orangey folders a journal rolls from;
+  the side panel lists their oracles, grouped by folder, and a click rolls one
+  at the cursor. The slash menu searches only those folders.
+- **Smarter order in the slash menu**: oracles rolled recently come first,
+  and an oracle named by a word you just wrote moves up.
+- **Picks and bags.** A list that offers a choice shows it at the cursor and
+  lands the pick, marked as picked; a bag gives each outcome once per journal
+  and refills itself when empty. Re-rolling a bag's chip puts its old answer
+  back first.
+- **Your own commands**, per journal: `/feeling` rolls several oracles and
+  dice at once, made in the side panel's Commands.
+- **A status panel**: a second page per journal beside the story, for health,
+  supplies, threads; it takes tables and rolls too.
+- **Tables**, in the story and the status panel, with Tab between cells and
+  toolbar buttons for rows and columns. Built on prosemirror-tables, which
+  comes with Tiptap: nothing new to install.
+- **Text styling**: highlight and text colour from small palettes, three
+  sizes, and three typefaces (story serif, sans, typewriter).
+- **Chapters**: a Chapter heading above Scene and Beat, and a Contents list in
+  the side panel that jumps to any of them. Printing starts each chapter on a
+  new page.
+- **Files**: save a journal to a file (and in Chrome and Edge, save again to
+  the same file), open one (replacing the journal it came from, or beside it),
+  export as Markdown or a web page with a footnote per roll, and print or save
+  as PDF with a print layout that shows only the story.
+- **Turn into text** in a chip's pop-up: keeps the words, stops the roll.
+- The side panel is now four tabs: Status, Oracles, Contents, Commands.
+- **One File menu, as in a word processor**: New, Open (recent journals, then
+  Browse for a file), Save, Save as, Export, Print. It replaces the separate
+  Journals button.
+
 - **Oracles roll into the text.** Type `/` and part of a name: the matching
   oracles from your Orangey library pop up at the cursor, with their folders,
   and Enter rolls one in place of what was typed. `/2d6` and any dice

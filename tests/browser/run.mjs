@@ -9,7 +9,7 @@
  */
 
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch, serve } from "../../vendor/orangey/tests/browser/cdp.mjs";
@@ -121,8 +121,8 @@ await test("A the title is saved like the text, and Enter goes back to the page"
 await test("B a new journal is made and switched to in place, and each keeps its own words and its own undo", async (page) => {
   await open(page);
   await typeText(page, "First campaign.");
-  await page.click(".menu-button");
-  await page.click(".menu-item.new");
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="new"]');
   await page.waitForFunction(`document.querySelector(".title").value === "Untitled journal 2"`);
   assert.equal(await page.evaluate(`return document.activeElement === document.querySelector(".title")`), true, "the new title is not ready to be named");
   assert.equal(await pageText(page), "");
@@ -130,10 +130,11 @@ await test("B a new journal is made and switched to in place, and each keeps its
   await typeText(page, "Second campaign.");
   await saved(page);
 
-  await page.click(".menu-button");
-  const rows = await page.evaluate(`return [...document.querySelectorAll(".menu-item:not(.new) .name")].map((e) => e.textContent)`);
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="open"]');
+  const rows = await page.evaluate(`return [...document.querySelectorAll(".sub-menu .menu-item.recent .name")].map((e) => e.textContent)`);
   assert.deepEqual(rows, ["Untitled journal 2", "Untitled journal"], "newest first");
-  await page.evaluate(`[...document.querySelectorAll(".menu-item:not(.new)")].find((e) => e.querySelector(".name").textContent === "Untitled journal").click()`);
+  await page.evaluate(`[...document.querySelectorAll(".sub-menu .menu-item.recent")].find((e) => e.querySelector(".name").textContent === "Untitled journal").click()`);
   await page.waitForFunction(`document.querySelector(".page").textContent === "First campaign."`);
 
   // Reopening comes back to the journal used last.
@@ -298,8 +299,10 @@ await test("G the library is read where Orangey keeps it: oracles, not boards, w
   await openSeeded(page);
   assert.equal(await page.evaluate(`return window.storyboard.library.status`), "ready");
   assert.deepEqual(await page.evaluate(`return window.storyboard.library.oracles.map((o) => o.name).sort()`), ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
-  await page.click(".shelf-toggle");
-  assert.match(await page.evaluate(`return document.querySelector(".library-panel").textContent`), /4 oracles from your Orangey library/);
+  await page.click("#tab-oracles");
+  const names = await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .oracle-button")].map((b) => b.textContent)`);
+  assert.deepEqual(names, ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
+  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .group-head")].map((b) => b.textContent)`), ["Starforged"]);
 });
 
 await test("G / and part of a name rolls the oracle into the text, and the journal keeps a copy of it", async (page) => {
@@ -450,7 +453,7 @@ await test("K opened from disk, it says it cannot see the library, and dice stil
   const file = `file://${join(dist, "storyboard.html")}?debug&seed=disk`;
   await page.goto(file);
   await ready(page);
-  await page.click(".shelf-toggle");
+  await page.click("#tab-oracles");
   assert.match(await page.evaluate(`return document.querySelector(".library-panel").textContent`), /opened from disk/);
   await slashRoll(page, "d20");
   await page.waitForFunction(`document.querySelector(".page .chip")`);
@@ -485,6 +488,351 @@ await test("L served beside Orangey, Storyboard rolls a wheel made in Orangey it
   } finally {
     await new Promise((r) => both.close(r));
   }
+});
+
+// --- the second round: Tab, folders, picks, bags, commands, status, tables, styles, chapters, width, files ---
+
+const MORE = {
+  ...ORACLES,
+  "Starforged/Ask.orangey.json": { id: "ask", type: "list", name: "Ask the Oracle", view: "list", offer: 3, items: ["Yes", "No", "Maybe", "Twist"].map((label, i) => ({ id: `a${i}`, label, weight: 1 })) },
+  "Starforged/Deck.orangey.json": { id: "deck", type: "list", name: "Deck", view: "list", withoutReplacement: true, items: ["Ace", "King"].map((label, i) => ({ id: `d${i}`, label, weight: 1 })) },
+};
+
+const openMore = async (page) => {
+  await open(page);
+  await seedLibrary(page, MORE);
+  await openSeeded(page);
+};
+
+await test("M Tab fills in what the matches share, then goes round the names; only Enter rolls", async (page) => {
+  await openMore(page);
+  await typeText(page, "/npc");
+  await page.waitForFunction(`document.querySelectorAll(".slash-menu .slash-item").length === 2`);
+  await press(page, "Tab");
+  await page.waitForFunction(`document.querySelector(".page").textContent === "/NPC "`);
+  await press(page, "Tab");
+  await page.waitForFunction(`/^\\/NPC (Motive|Role)$/.test(document.querySelector(".page").textContent)`);
+  const first = await pageText(page);
+  await press(page, "Tab");
+  await page.waitForFunction(`document.querySelector(".page").textContent !== ${JSON.stringify(first)}`);
+  assert.equal((await chips(page)).length, 0, "Tab rolled something");
+  await press(page, "Enter");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+});
+
+await test("N a journal rolls only from the folders it is given, and keeps that choice", async (page) => {
+  await openMore(page);
+  await page.click("#tab-oracles");
+  await page.click(".folders-line .link-button");
+  await page.evaluate(`[...document.querySelectorAll(".folder-option")].find((l) => l.textContent.trim() === "Starforged").querySelector("input").click()`);
+  await page.waitForFunction(`document.querySelector(".folders-now").textContent.trim() === "Starforged"`);
+  assert.equal(await page.evaluate(`return [...document.querySelectorAll(".oracle-button")].some((b) => b.textContent === "Inkblot")`), false, "an oracle outside the folder is listed");
+  await typeText(page, "/inkbl");
+  await page.waitForFunction(`document.querySelector(".slash-item[data-kind=note]")`);
+  await press(page, "Escape");
+  await saved(page);
+  await openSeeded(page);
+  assert.deepEqual(await page.evaluate(`return window.storyboard.session.view().folders`), ["Starforged"]);
+});
+
+await test("N an oracle clicked in the panel rolls at the cursor, and recent oracles come first", async (page) => {
+  await openMore(page);
+  await typeText(page, "Outside: ");
+  await page.click("#tab-oracles");
+  await page.evaluate(`document.querySelector('.oracle-button[data-id="weather"]').click()`);
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  assert.match(await pageText(page), /^Outside: (Rain|Sun|Fog)$/);
+  await typeText(page, " /");
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item")`);
+  assert.equal(await page.evaluate(`return document.querySelector(".slash-menu .slash-main").textContent`), "Weather");
+  await press(page, "Escape");
+});
+
+await test("N a word just written moves the oracle it names up the menu", async (page) => {
+  await openMore(page);
+  await typeText(page, "Her motive is ");
+  await typeText(page, "/npc");
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item")`);
+  assert.equal(await page.evaluate(`return document.querySelector(".slash-menu .slash-main").textContent`), "NPC Motive");
+  await press(page, "Escape");
+});
+
+await test("O a list that offers a choice shows it at the cursor, and the pick lands, marked as picked", async (page) => {
+  await openMore(page);
+  await slashRoll(page, "ask the");
+  await page.waitForFunction(`document.querySelectorAll(".pick-menu .slash-item").length === 3`);
+  const choices = await page.evaluate(`return [...document.querySelectorAll(".pick-menu .slash-main")].map((e) => e.textContent)`);
+  await press(page, "2");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  const [record] = await chips(page);
+  assert.equal(currentText(record), choices[1]);
+  assert.equal(record.results[0].picked, true);
+  assert.equal(await page.evaluate(`return document.querySelector(".pick-menu")`), null);
+});
+
+await test("O a bag gives each outcome once, and what it has given out is saved with the journal", async (page) => {
+  await openMore(page);
+  await slashRoll(page, "deck");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 1`);
+  await typeText(page, " ");
+  await slashRoll(page, "deck");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  const texts = (await chips(page)).map(currentText).sort();
+  assert.deepEqual(texts, ["Ace", "King"]);
+  await saved(page);
+  const bags = await page.evaluate(`return (await window.storyboard.store.get(window.storyboard.session.view().currentId)).bags`);
+  assert.deepEqual([...bags.deck].sort(), ["Ace", "King"]);
+});
+
+await test("P a journal's own command rolls everything it lists, one chip each", async (page) => {
+  await openMore(page);
+  await page.click("#tab-commands");
+  await page.click(".new-command");
+  await page.type(".command-name-input", "feeling");
+  for (const step of ["weather", "2d6"]) {
+    await page.type(".step-input", step);
+    await page.waitForFunction(`document.querySelector(".step-suggestions button")`);
+    await page.evaluate(`document.querySelector(".step-suggestions button").click()`);
+  }
+  await page.evaluate(`document.querySelector(".command-form button[type=submit]").click()`);
+  await page.waitForFunction(`document.querySelector(".command-list .command-name")?.textContent === "/feeling"`);
+  await slashRoll(page, "feel");
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  const [a, b] = await chips(page);
+  assert.equal(a.source.kind === "oracle" && a.source.id, "weather");
+  assert.equal(b.source.kind === "dice" && b.source.expression, "2d6");
+  await saved(page);
+  await openSeeded(page);
+  assert.equal((await page.evaluate(`return window.storyboard.session.view().commands`))[0].name, "feeling");
+});
+
+await test("Q the status panel keeps its own notes per journal, and rolls land there too", async (page) => {
+  await openMore(page);
+  await page.click("#tab-status");
+  await page.evaluate(`window.storyboard.statusEditor.commands.focus("end")`);
+  await page.waitForFunction(`document.activeElement === document.querySelector(".status-page")`);
+  for (const ch of "Supplies: ") {
+    await page.send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, key: ch });
+    await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+  }
+  for (const ch of "/2d6") {
+    await page.send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, key: ch });
+    await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+  }
+  await page.waitForFunction(`document.querySelector(".slash-menu .slash-item")`);
+  await press(page, "Enter");
+  await page.waitForFunction(`document.querySelector(".status-page .chip")`);
+  await saved(page);
+  await openSeeded(page);
+  assert.match(await page.evaluate(`return document.querySelector(".status-page").textContent`), /^Supplies: \d+$/);
+  assert.equal(await pageText(page), "", "the status note leaked into the story");
+});
+
+await test("R a table goes in from the toolbar; Tab moves between cells, and rows are added", async (page) => {
+  await openMore(page);
+  await typeText(page, "Loot");
+  await page.evaluate(`document.querySelector('[aria-label="Insert a table"]').click()`);
+  await page.waitForFunction(`document.querySelector(".page table")`);
+  // Straight into the first cell: no re-focusing, which would move the cursor to the end.
+  const typeHere = async (t) => {
+    for (const ch of t) {
+      await page.send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, key: ch });
+      await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+    }
+  };
+  await typeHere("Item");
+  await press(page, "Tab");
+  await typeHere("Qty");
+  await page.waitForFunction(`document.querySelector('[aria-label="Add a row below"]')`);
+  await page.evaluate(`document.querySelector('[aria-label="Add a row below"]').click()`);
+  const shape = await page.evaluate(`return [...document.querySelectorAll(".page table tr")].map((r) => r.children.length)`);
+  assert.deepEqual(shape, [3, 3, 3, 3]);
+  assert.deepEqual(await page.evaluate(`return [...document.querySelectorAll(".page table th")].slice(0, 2).map((c) => c.textContent)`), ["Item", "Qty"]);
+  await saved(page);
+  await openSeeded(page);
+  assert.equal(await page.evaluate(`return document.querySelectorAll(".page table tr").length`), 4);
+});
+
+await test("S highlight, colour, size and typeface style the selection, and are kept", async (page) => {
+  await openMore(page);
+  await typeText(page, "danger ahead");
+  await page.evaluate(`window.storyboard.editor.commands.setTextSelection({ from: 1, to: 7 })`);
+  await page.click('[aria-label="Highlight"]');
+  await page.click('[aria-label="Yellow highlight"]');
+  await page.click('[aria-label="Text colour"]');
+  await page.click('[aria-label="Red text"]');
+  await page.evaluate(`const s = document.querySelector('[aria-label="Text size"]'); s.value = "large"; s.dispatchEvent(new Event("change", { bubbles: true }))`);
+  await page.evaluate(`const s = document.querySelector('[aria-label="Typeface"]'); s.value = "mono"; s.dispatchEvent(new Event("change", { bubbles: true }))`);
+  await page.waitForFunction(`document.querySelector(".page mark.hl-yellow")`);
+  await saved(page);
+  await openSeeded(page);
+  const styled = await page.evaluate(`
+    const el = document.querySelector(".page mark.hl-yellow");
+    return { text: el.textContent, classes: [...document.querySelectorAll(".page [class]")].map((e) => e.className).join(" ") };
+  `);
+  assert.equal(styled.text, "danger");
+  for (const cls of ["hl-yellow", "tc-red", "fs-large", "ff-mono"]) assert.match(styled.classes, new RegExp(cls));
+});
+
+await test("T chapters head the story, the contents list them, and a click jumps to one", async (page) => {
+  await openMore(page);
+  await typeText(page, "The Wreck");
+  await page.evaluate(`document.querySelector('[aria-label^="Chapter heading"]').click()`);
+  await page.waitForFunction(`document.querySelector(".page h1")`);
+  await page.evaluate(`window.storyboard.editor.chain().focus("end").insertContent([{ type: "paragraph" }, { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "On the beach" }] }, { type: "paragraph", content: [{ type: "text", text: "Sand." }] }]).run()`);
+  await page.click("#tab-contents");
+  await page.waitForFunction(`document.querySelectorAll(".outline li").length === 2`);
+  const rows = await page.evaluate(`return [...document.querySelectorAll(".outline li")].map((l) => [l.className, l.textContent.trim()])`);
+  assert.deepEqual(rows, [["level-1", "The Wreck"], ["level-2", "On the beach"]]);
+  await page.evaluate(`[...document.querySelectorAll(".outline button")][0].click()`);
+  await page.waitForFunction(`window.storyboard.editor.state.selection.$from.parent.textContent === "The Wreck"`);
+});
+
+await test("U the page can be narrow, wide or full, and the choice is kept", async (page) => {
+  await open(page);
+  const width = () => page.evaluate(`return Math.round(document.querySelector(".page").getBoundingClientRect().width)`);
+  assert.ok(await page.evaluate(`return document.querySelector(".app").classList.contains("width-wide")`), "wide is not the default");
+  const wide = await width();
+  await page.evaluate(`const s = document.querySelector(".width-select"); s.value = "narrow"; s.dispatchEvent(new Event("change", { bubbles: true }))`);
+  await page.waitForFunction(`document.querySelector(".app").classList.contains("width-narrow")`);
+  const narrow = await width();
+  assert.ok(narrow < wide, `narrow ${narrow} is not narrower than wide ${wide}`);
+  await open(page);
+  assert.ok(await page.evaluate(`return document.querySelector(".app").classList.contains("width-narrow")`), "the width was not kept");
+});
+
+await test("V a journal saved as a file opens again: as a copy beside the original, or replacing it", async (page) => {
+  await openMore(page);
+  await typeText(page, "Saved words ");
+  await slashRoll(page, "weather");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  const dir = join(root, ".tmp", "files");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  // Without the save picker (headless Chrome has no dialog), Save downloads the file.
+  await page.evaluate(`delete window.showSaveFilePicker; window.showSaveFilePicker = undefined;`);
+  await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="save"]');
+  const file = join(dir, "untitled-journal.storyboard.json");
+  for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(existsSync(file), "no journal file was downloaded");
+  const saved = JSON.parse(readFileSync(file, "utf8"));
+  assert.equal(saved.format, "storyboard-journal");
+  assert.ok(Object.keys(saved.oracles).length > 0, "the file has no oracle copies to re-roll with");
+
+  await page.send("Page.setInterceptFileChooserDialog", { enabled: true });
+  const chooser = page.waitFor("Page.fileChooserOpened");
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="open"]');
+  await page.click('.file-menu [data-action="browse"]');
+  const { backendNodeId } = await chooser;
+  await page.send("DOM.setFileInputFiles", { files: [file], backendNodeId });
+  await page.waitForFunction(`document.querySelector(".dialog [data-choice=copy]")`);
+  await page.click(".dialog [data-choice=copy]");
+  await page.waitForFunction(`window.storyboard.session.view().journals.length === 2`);
+  assert.equal(await page.evaluate(`return window.storyboard.session.view().title`), "Untitled journal 2");
+  assert.match(await pageText(page), /^Saved words (Rain|Sun|Fog)$/);
+
+  // Exports land as files too.
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="export"]');
+  await page.click('.file-menu [data-action="markdown"]');
+  const md = join(dir, "untitled-journal-2.md");
+  for (let i = 0; i < 100 && !existsSync(md); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(readFileSync(md, "utf8"), /^# Untitled journal 2\n\nSaved words (Rain|Sun|Fog)\[\^1\]/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+await test("W a journal keeps a copy of its folders, and rolls them from disk on a computer without Orangey", async (page) => {
+  await openMore(page);
+  await page.click("#tab-oracles");
+  await page.click(".folders-line .link-button");
+  await page.evaluate(`[...document.querySelectorAll(".folder-option")].find((l) => l.textContent.trim() === "Starforged").querySelector("input").click()`);
+  await page.waitForFunction(`window.storyboard.session.copy?.oracles.length > 0`);
+  const copy = await page.evaluate(`return window.storyboard.session.copy.oracles.map((o) => o.id).sort()`);
+  assert.deepEqual(copy, ["ask", "deck", "motive", "npc", "weather"], "the copy is not exactly the chosen folder");
+  await typeText(page, "Copied ");
+  const dir = join(root, ".tmp", "usb");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  await page.evaluate(`delete window.showSaveFilePicker; window.showSaveFilePicker = undefined;`);
+  await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="save"]');
+  const file = join(dir, "untitled-journal.storyboard.json");
+  for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(existsSync(file), "no journal file was downloaded");
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).copy.oracles.length, 5);
+
+  // The other computer: the single file from disk, which sees no Orangey library.
+  await page.goto(`file://${join(dist, "storyboard.html")}?debug&seed=usb`);
+  await ready(page);
+  // A real click first: a file chooser opens only after the person has used the page.
+  await clickOn(page, ".page");
+  await page.send("Page.setInterceptFileChooserDialog", { enabled: true });
+  const chooser = page.waitFor("Page.fileChooserOpened");
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="open"]');
+  await page.click('.file-menu [data-action="browse"]');
+  const { backendNodeId } = await chooser;
+  await page.send("DOM.setFileInputFiles", { files: [file], backendNodeId });
+  await page.waitForFunction(`/^Copied/.test(document.querySelector(".page").textContent)`);
+  await page.click("#tab-oracles");
+  await page.waitForFunction(`document.querySelector(".library-panel[data-copy=only]")`);
+  assert.match(await page.evaluate(`return document.querySelector(".copy-note").textContent`), /copy this journal keeps/);
+  assert.equal(await page.evaluate(`return document.querySelectorAll(".oracle-button").length`), 5);
+  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await slashRoll(page, "npc role");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  await press(page, "n", { alt: true });
+  await page.waitForFunction(`document.querySelectorAll(".page .chip").length === 2`);
+  const rolled = await chips(page);
+  assert.equal(rolled[1].source.name, "NPC Motive");
+  rmSync(dir, { recursive: true, force: true });
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("X an oracle from an installed pack shows its credit on the chip, and the chip keeps it for exports", async (page) => {
+  await open(page);
+  await seedLibrary(page, {
+    "Delve/Theme.orangey.json": { id: "theme", type: "list", name: "Delve Theme", view: "wheel", items: ["Ancient", "Hallowed"].map((label, i) => ({ id: `t${i}`, label, weight: 1 })) },
+  });
+  await page.evaluate(`
+    const root = await (await navigator.storage.getDirectory()).getDirectoryHandle("library");
+    const dir = await root.getDirectoryHandle("Delve");
+    const w = await (await dir.getFileHandle("orangey-pack.json", { create: true })).createWritable();
+    await w.write(JSON.stringify({ format: "orangey-pack", version: 1, pack: { id: "p", title: "Delve", author: "A. Writer", version: "1.0", licence: "CC BY 4.0", homepage: "https://example.org/delve", installed: "2026-10-02T00:00:00.000Z" } }));
+    await w.close();
+  `);
+  await openSeeded(page);
+  await slashRoll(page, "delve theme");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  await clickOn(page, ".page .chip");
+  await page.waitForFunction(`document.querySelector(".chip-popover .credit")`);
+  assert.match(await page.evaluate(`return document.querySelector(".chip-popover .credit").textContent.replace(/\\s+/g, " ").trim()`), /^From Delve by A\. Writer · v1\.0 · CC BY 4\.0 · web page$/);
+  const journal = await page.evaluate(`return await window.storyboard.session.current()`);
+  const rec = JSON.stringify(journal.doc).match(/"pack":\{[^}]*\}/);
+  assert.ok(rec && rec[0].includes('"author":"A. Writer"'), "the chip did not keep its pack's credit");
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("Y an outcome that refers to another table rolls it into the chip, and says which table gave what", async (page) => {
+  await open(page);
+  await seedLibrary(page, {
+    ...ORACLES,
+    "Starforged/Morning.orangey.json": { id: "morning", type: "list", name: "Morning", view: "list", items: [{ id: "m0", label: "A {@Weather|weather} morning", weight: 1 }] },
+  });
+  await openSeeded(page);
+  await slashRoll(page, "morning");
+  await page.waitForFunction(`document.querySelector(".page .chip")`);
+  const [rec] = await chips(page);
+  assert.match(rec.results[0].text, /^A (Rain|Sun|Fog) morning$/);
+  assert.deepEqual(rec.results[0].parts.map((p) => p.name), ["Weather"]);
+  await clickOn(page, ".page .chip");
+  await page.waitForFunction(`document.querySelector(".chip-popover .parts")`);
+  assert.match(await page.evaluate(`return document.querySelector(".chip-popover .parts").textContent`), /^Weather: (Rain|Sun|Fog)$/);
+  assert.deepEqual(page.consoleErrors, []);
 });
 
 // --- report -------------------------------------------------------------------
