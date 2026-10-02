@@ -42,10 +42,17 @@ the same address. That is what `serve:both` is for when trying it locally.
 
 The *File* menu works like a word processor's: **New journal**; **Open**, with
 your recent journals and **Browse for a journal file…** (Ctrl+O; a journal
-already here can be replaced or kept beside the copy); **Save to a file**
-(Ctrl+Shift+S; in Chrome and Edge, later saves go to the same file) and
-**Save as…**; **Export** as Markdown or a web page; and **Print, or save as
-PDF** (Ctrl+P).
+already here can be replaced or kept beside the copy); **Save** (Ctrl+S) and
+**Save as…** (Ctrl+Shift+S); **Export** as Markdown or a web page; and
+**Print, or save as PDF** (Ctrl+P).
+
+In Chrome and Edge a journal belongs to a file on disk. Save writes straight
+back to it, asking where only the first time; Save as asks, and the file chosen
+becomes the journal's; a journal opened from its file saves back to that file,
+and one kept as a copy starts with no file. The menu shows the file's name.
+The link survives a reload (the first Save after one may ask permission to edit
+the file). Firefox and Safari cannot write to a file on disk, so there each
+save downloads a copy, and Save as asks for the name first.
 
 The journal you write in is kept in this browser and saved as you type; a
 saved file is a portable copy and your backup. Clearing the site's data, or
@@ -100,7 +107,7 @@ oracles it rolled, so it re-rolls on any computer.
 `dist/storyboard.html` also opens straight from disk: double-click it.
 
 Journals are kept in this browser (IndexedDB, database `storyboard`) and saved
-half a second after you stop typing; Ctrl+S saves at once.
+half a second after you stop typing (and at once when you save to a file).
 
 ## How it relates to Orangey
 

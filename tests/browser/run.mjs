@@ -153,15 +153,135 @@ await test("C no keystroke is lost while saves run in the middle of typing", asy
   assert.equal(await storedText(page), await pageText(page), "what was stored differs from the page");
 });
 
-await test("C Ctrl+S saves at once instead of waiting for the pause", async (page) => {
+/**
+ * A stand-in for Chrome's save and open pickers, giving real files in the
+ * page's own private storage (OPFS): they can be written, kept in IndexedDB
+ * across a reload, and read back. Counts how often each picker was shown.
+ */
+const fakePickers = (page) =>
+  page.evaluate(`
+    window.__picked = { save: 0, open: 0 };
+    const dir = () => navigator.storage.getDirectory();
+    window.showSaveFilePicker = async ({ suggestedName }) => {
+      window.__picked.save++;
+      return (await dir()).getFileHandle(window.__saveAs ?? suggestedName, { create: true });
+    };
+    window.showOpenFilePicker = async () => {
+      window.__picked.open++;
+      return [await (await dir()).getFileHandle(window.__openName)];
+    };
+  `);
+const fileText = (page, name) => page.evaluate(`return await (await (await (await navigator.storage.getDirectory()).getFileHandle(${JSON.stringify(name)})).getFile()).text()`);
+const ctrlS = async (page, shift = false) => {
+  const modifiers = 2 | (shift ? 8 : 0);
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: shift ? "S" : "s", code: "KeyS", modifiers, windowsVirtualKeyCode: 83 });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: shift ? "S" : "s", code: "KeyS", modifiers, windowsVirtualKeyCode: 83 });
+};
+
+await test("C Ctrl+S saves the journal to its file: it asks where once, then writes there, also after a reload; Save as asks again", async (page) => {
   await open(page);
+  await fakePickers(page);
   await typeText(page, "Now.");
-  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "s", code: "KeyS", modifiers: 2, windowsVirtualKeyCode: 83 });
-  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "s", code: "KeyS", modifiers: 2, windowsVirtualKeyCode: 83 });
-  const started = Date.now();
-  await saved(page);
-  assert.ok(Date.now() - started < 400, "saving waited for the pause");
+  await ctrlS(page);
+  await page.waitForFunction(`/Saved to untitled-journal\\.storyboard\\.json/.test(document.querySelector(".toast")?.textContent ?? "")`);
   assert.equal(await pageText(page), "Now.", "Ctrl+S typed into the page");
+  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /"text": "Now\."/);
+  // Saved in the browser at once too, not after the pause.
+  await saved(page);
+
+  // The menu names the file, and Save writes to it without asking.
+  await page.click(".file-menu .menu-button");
+  assert.equal(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"] .save-label').textContent.trim()`), "Save to untitled-journal.storyboard.json");
+  await page.click('.file-menu [data-action="save"]');
+  await page.waitForFunction(`window.__picked.save === 1 && /Saved to/.test(document.querySelector(".toast")?.textContent ?? "")`);
+  await typeText(page, " Then.");
+  await ctrlS(page);
+  await page.waitForFunction(`document.querySelector(".toast")?.textContent.startsWith("Saved to")`);
+  for (let i = 0; i < 40 && !/Now\. Then\./.test(await fileText(page, "untitled-journal.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /Now\. Then\./);
+  assert.equal(await page.evaluate(`return window.__picked.save`), 1, "Save asked where again");
+
+  // After a reload the journal still belongs to its file.
+  await open(page);
+  await fakePickers(page);
+  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await typeText(page, " Later.");
+  await ctrlS(page);
+  for (let i = 0; i < 40 && !/Later\./.test(await fileText(page, "untitled-journal.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /Now\. Then\. Later\./);
+  assert.equal(await page.evaluate(`return window.__picked.save`), 0, "after a reload, Save asked where");
+
+  // Save as (Ctrl+Shift+S) asks, and the new file is the journal's from then on.
+  await page.evaluate(`window.__saveAs = "second.storyboard.json"`);
+  await ctrlS(page, true);
+  await page.waitForFunction(`window.__picked.save === 1 && /second/.test(document.querySelector(".toast")?.textContent ?? "")`);
+  await page.click(".file-menu .menu-button");
+  assert.match(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"]').textContent`), /Save to second\.storyboard\.json/);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("C a journal opened from its file saves back to that file; kept as a copy, it does not", async (page) => {
+  await open(page);
+  await fakePickers(page);
+  await typeText(page, "Original.");
+  await ctrlS(page);
+  await page.waitForFunction(`document.querySelector(".toast")?.textContent.startsWith("Saved to")`);
+  // A new journal, then the file opened again: it is the journal already here.
+  await page.evaluate(`window.__openName = "untitled-journal.storyboard.json"`);
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="open"]');
+  await page.click('.file-menu [data-action="browse"]');
+  await page.waitForFunction(`document.querySelector(".dialog [data-choice=copy]")`);
+  await page.click(".dialog [data-choice=copy]");
+  await page.waitForFunction(`window.storyboard.session.view().journals.length === 2`);
+  // The copy has no file: the menu offers to choose one, and Save asks.
+  await page.click(".file-menu .menu-button");
+  await page.waitForFunction(`document.querySelector('.file-menu [data-action="save"] .save-label')?.textContent.trim() === "Save to a file…"`);
+  await page.evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+
+  // A journal file that is not here yet: opened, it belongs to its file.
+  const other = await page.evaluate(`
+    const j = { ...(await window.storyboard.session.current()), id: "from-disk", title: "From disk" };
+    const h = await (await navigator.storage.getDirectory()).getFileHandle("from-disk.storyboard.json", { create: true });
+    const w = await h.createWritable(); await w.write(JSON.stringify(j)); await w.close();
+    window.__openName = "from-disk.storyboard.json";
+    return j.id;`);
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="open"]');
+  await page.click('.file-menu [data-action="browse"]');
+  await page.waitForFunction(`window.storyboard.session.view().currentId === ${JSON.stringify(other)}`);
+  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await typeText(page, " Edited.");
+  await ctrlS(page);
+  for (let i = 0; i < 40 && !/Edited\./.test(await fileText(page, "from-disk.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "from-disk.storyboard.json"), /Edited\./);
+  assert.equal(await page.evaluate(`return window.__picked.save`), 1, "saving a journal opened from its file asked where");
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("C without a file picker (Firefox, Safari), Save as asks for a name and downloads under it", async (page) => {
+  await open(page);
+  await typeText(page, "Plain.");
+  const dir = join(root, ".tmp", "nopicker");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  await page.evaluate(`delete window.showSaveFilePicker; window.showSaveFilePicker = undefined; delete window.showOpenFilePicker; window.showOpenFilePicker = undefined;`);
+  await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
+  await page.click(".file-menu .menu-button");
+  assert.equal(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"] .save-label').textContent.trim()`), "Download a copy");
+  await page.click('.file-menu [data-action="saveas"]');
+  await page.waitForFunction(`document.querySelector(".dialog .file-name")`);
+  await page.evaluate(`
+    const input = document.querySelector(".dialog .file-name");
+    input.value = "My Campaign";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector(".dialog [data-choice=save]").click();`);
+  const file = join(dir, "My Campaign.storyboard.json");
+  for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(existsSync(file), "nothing was downloaded under the name given");
+  assert.match(readFileSync(file, "utf8"), /Plain\./);
+  rmSync(dir, { recursive: true, force: true });
+  assert.deepEqual(page.consoleErrors, []);
 });
 
 await test("D the app opens offline once visited, with its caches all named storyboard-", async (page) => {
@@ -721,6 +841,8 @@ await test("V a journal saved as a file opens again: as a copy beside the origin
   assert.equal(saved.format, "storyboard-journal");
   assert.ok(Object.keys(saved.oracles).length > 0, "the file has no oracle copies to re-roll with");
 
+  // The plain file input, as in Firefox: Chrome's own open picker gives the test no file input to fill.
+  await page.evaluate(`delete window.showOpenFilePicker; window.showOpenFilePicker = undefined;`);
   await page.send("Page.setInterceptFileChooserDialog", { enabled: true });
   const chooser = page.waitFor("Page.fileChooserOpened");
   await page.click(".file-menu .menu-button");
@@ -770,6 +892,8 @@ await test("W a journal keeps a copy of its folders, and rolls them from disk on
   await ready(page);
   // A real click first: a file chooser opens only after the person has used the page.
   await clickOn(page, ".page");
+  // The plain file input, as in Firefox: Chrome's own open picker gives the test no file input to fill.
+  await page.evaluate(`delete window.showOpenFilePicker; window.showOpenFilePicker = undefined;`);
   await page.send("Page.setInterceptFileChooserDialog", { enabled: true });
   const chooser = page.waitFor("Page.fileChooserOpened");
   await page.click(".file-menu .menu-button");
@@ -832,6 +956,32 @@ await test("Y an outcome that refers to another table rolls it into the chip, an
   await clickOn(page, ".page .chip");
   await page.waitForFunction(`document.querySelector(".chip-popover .parts")`);
   assert.match(await page.evaluate(`return document.querySelector(".chip-popover .parts").textContent`), /^Weather: (Rain|Sun|Fog)$/);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("Z the side panel's width is dragged by its edge, set from the keyboard, kept, and reset by a double-click", async (page) => {
+  await open(page);
+  const width = () => page.evaluate(`return Math.round(document.querySelector("#shelf").getBoundingClientRect().width)`);
+  const before = await width();
+  const box = await page.evaluate(`
+    const r = document.querySelector(".shelf-resizer").getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + 200 };
+  `);
+  await page.send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x, y: box.y, button: "left", clickCount: 1 });
+  for (let i = 1; i <= 5; i++) await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x - i * 20, y: box.y, button: "left", buttons: 1 });
+  await page.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x - 100, y: box.y, button: "left", clickCount: 1 });
+  await page.waitForFunction(`Math.round(document.querySelector("#shelf").getBoundingClientRect().width) === ${before + 100}`);
+  // Kept after a reload.
+  await open(page);
+  assert.equal(await width(), before + 100);
+  // Keyboard: the edge takes focus, and an arrow makes the panel wider or narrower.
+  await page.evaluate(`document.querySelector(".shelf-resizer").focus()`);
+  await press(page, "ArrowRight");
+  await page.waitForFunction(`Math.round(document.querySelector("#shelf").getBoundingClientRect().width) === ${before + 84}`);
+  assert.equal(await page.evaluate(`return document.querySelector(".shelf-resizer").getAttribute("aria-valuenow")`), String(before + 84));
+  // A double-click puts it back.
+  await page.evaluate(`document.querySelector(".shelf-resizer").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+  await page.waitForFunction(`Math.round(document.querySelector("#shelf").getBoundingClientRect().width) === 352`);
   assert.deepEqual(page.consoleErrors, []);
 });
 

@@ -18,8 +18,8 @@
   import { RollControl } from "./lib/rollnodes.ts";
   import { pickAtCursor, type SlashItem, type SlashSource } from "./lib/slash.ts";
   import { fileStem, FILE_SUFFIX, outline, toFile, toHtml, toMarkdown, type OutlineEntry } from "./lib/export.ts";
-  import { openText, saveText, download } from "./lib/files.ts";
-  import { loadPrefs, savePrefs, WIDTHS, type PageWidth } from "./lib/prefs.ts";
+  import { canWriteFiles, fileFor, forgetFile, openText, rememberFile, saveText, download, type FileHandle } from "./lib/files.ts";
+  import { clampPanelWidth, loadPrefs, PANEL_DEFAULT, PANEL_MAX, PANEL_MIN, savePrefs, WIDTHS, type PageWidth } from "./lib/prefs.ts";
   import type { JournalCommand } from "./lib/journal.ts";
   import type { RollRecord } from "./lib/rolls.ts";
   import { sourceFor } from "../vendor/orangey/src/core/rng.ts";
@@ -41,7 +41,36 @@
   let keptCount = $state(0);
   let copySaved: string | null = $state(null);
   let outlineEntries: OutlineEntry[] = $state([]);
-  let duplicate: { raw: unknown; title: string } | null = $state(null);
+  let duplicate: { raw: unknown; title: string; handle?: FileHandle } | null = $state(null);
+  /** The file the open journal belongs to (Chrome, Edge), for the File menu. */
+  let currentFile: string | null = $state(null);
+  /** Save as without a file picker: the name being asked for. */
+  let namePrompt: { resolve: (name: string | null) => void } | null = $state(null);
+  let nameValue = $state("");
+  let nameInput: HTMLInputElement | undefined = $state();
+  $effect(() => {
+    if (namePrompt && nameInput) {
+      nameInput.focus();
+      nameInput.select();
+    }
+  });
+  function askName(suggested: string): Promise<string | null> {
+    nameValue = suggested;
+    return new Promise((resolve) => (namePrompt = { resolve }));
+  }
+  function answerName(name: string | null) {
+    const p = namePrompt;
+    namePrompt = null;
+    p?.resolve(name);
+  }
+  // Several can be under way at once (a switch, then a save): only the latest counts.
+  let fileAsk = 0;
+  async function refreshFile() {
+    const ask = ++fileAsk;
+    const id = session?.view().currentId;
+    const name = id ? ((await fileFor(id))?.name ?? null) : null;
+    if (ask === fileAsk && id === session?.view().currentId) currentFile = name;
+  }
   let pageHost: HTMLElement;
   let statusHost: HTMLElement;
   let titleInput: HTMLInputElement;
@@ -50,7 +79,41 @@
   let nameNext = false;
 
   const prefs = $state(loadPrefs());
-  $effect(() => savePrefs({ width: prefs.width, panelOpen: prefs.panelOpen, panelTab: prefs.panelTab }));
+  $effect(() => savePrefs({ width: prefs.width, panelWidth: prefs.panelWidth, panelOpen: prefs.panelOpen, panelTab: prefs.panelTab }));
+
+  // The side panel's width: drag its left edge, or focus the edge and use the
+  // arrow keys; a double-click puts it back. Kept per browser.
+  let windowWidth = $state(typeof innerWidth === "number" ? innerWidth : 1280);
+  const panelWidth = $derived(clampPanelWidth(prefs.panelWidth, windowWidth));
+  let dragging = $state(false);
+  function startResize(ev: PointerEvent) {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    const handle = ev.currentTarget as HTMLElement;
+    handle.setPointerCapture(ev.pointerId);
+    const startX = ev.clientX;
+    const startW = panelWidth;
+    dragging = true;
+    const move = (e: PointerEvent) => (prefs.panelWidth = clampPanelWidth(startW + (startX - e.clientX), windowWidth));
+    const end = () => {
+      dragging = false;
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  }
+  function resizeKey(ev: KeyboardEvent) {
+    const step = ev.shiftKey ? 64 : 16;
+    const by: Record<string, number> = { ArrowLeft: step, ArrowRight: -step };
+    if (ev.key in by) prefs.panelWidth = clampPanelWidth(panelWidth + by[ev.key], windowWidth);
+    else if (ev.key === "Home") prefs.panelWidth = PANEL_MIN;
+    else if (ev.key === "End") prefs.panelWidth = PANEL_MAX;
+    else return;
+    ev.preventDefault();
+  }
 
   const params = new URLSearchParams(location.search);
   const debug = params.has("debug");
@@ -93,6 +156,7 @@
     if (key !== lastJournalKey) {
       lastJournalKey = key;
       syncCopy();
+      void refreshFile();
     }
   }
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -296,14 +360,17 @@
       key: j.id,
       ask,
       description: "Storyboard journal",
+      suffix: FILE_SUFFIX,
       extension: ".json",
+      askName,
     });
-    if (outcome === "written") say("Saved to the file.");
-    else if (outcome === "downloaded") say("The journal file is in your downloads.");
+    if (outcome.kind === "written") say(`Saved to ${outcome.file}.`);
+    else if (outcome.kind === "downloaded") say(`${outcome.file} is in your downloads.`);
+    await refreshFile();
   }
 
   async function openFile() {
-    const file = await openText(".json,application/json");
+    const file = await openText(".json,application/json", { description: "Storyboard journal", mime: "application/json", extensions: [".json"] });
     if (!file) return;
     let raw: unknown;
     try {
@@ -314,17 +381,31 @@
     }
     const id = (raw as { id?: unknown })?.id;
     if (typeof id === "string" && session.has(id)) {
-      duplicate = { raw, title: String((raw as { title?: unknown }).title ?? "This journal") };
+      duplicate = { raw, title: String((raw as { title?: unknown }).title ?? "This journal"), handle: file.handle };
       return;
     }
-    if (await session.importJournal(raw)) say(`Opened “${view.title}”.`);
+    if (await session.importJournal(raw)) {
+      // Opened from its file: Save writes back to it.
+      if (file.handle && view.currentId) await rememberFile(view.currentId, file.handle);
+      await refreshFile();
+      say(`Opened “${view.title}”.`);
+    }
   }
 
   async function resolveDuplicate(choice: "replace" | "copy" | null) {
     const d = duplicate;
     duplicate = null;
     if (!d || !choice) return;
-    if (await session.importJournal(d.raw, choice)) say(choice === "replace" ? "The journal was replaced by the file." : "The file was opened as a copy.");
+    if (await session.importJournal(d.raw, choice)) {
+      // Replaced: the journal now belongs to the file opened. Kept as a copy:
+      // the copy has no file yet, so Save cannot write over the original's.
+      const id = view.currentId;
+      if (id && choice === "replace") {
+        if (d.handle) await rememberFile(id, d.handle);
+      } else if (id) await forgetFile(id);
+      await refreshFile();
+      say(choice === "replace" ? "The journal was replaced by the file." : "The file was opened as a copy.");
+    }
   }
 
   async function exportAs(kind: "markdown" | "html") {
@@ -358,11 +439,11 @@
     const mod = ev.ctrlKey || ev.metaKey;
     if (!mod || ev.altKey) return;
     const k = ev.key.toLowerCase();
-    // Ctrl/⌘+S saves in the browser now; with Shift, to a file.
+    // Ctrl/⌘+S saves to the journal's file (asking where the first time);
+    // with Shift, Save as. The browser copy is saved as you type anyway.
     if (k === "s") {
       ev.preventDefault();
-      if (ev.shiftKey) void saveToFile();
-      else void session?.flush();
+      void saveToFile(ev.shiftKey);
     } else if (k === "o" && !ev.shiftKey) {
       ev.preventDefault();
       void openFile();
@@ -377,9 +458,9 @@
   const setCommands = (c: JournalCommand[]) => session.setCommands(c);
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} bind:innerWidth={windowWidth} />
 
-<div class="app width-{prefs.width}" class:ready class:panel-open={prefs.panelOpen}>
+<div class="app width-{prefs.width}" class:ready class:panel-open={prefs.panelOpen} class:resizing={dragging}>
   <header class="topbar">
     <FileMenu
       journals={view.journals}
@@ -387,6 +468,8 @@
       oncreate={create}
       onswitch={(id) => session.open(id)}
       onbrowse={openFile}
+      {currentFile}
+      canWrite={canWriteFiles()}
       onsave={() => saveToFile()}
       onsaveas={() => saveToFile(true)}
       onmarkdown={() => exportAs("markdown")}
@@ -424,7 +507,24 @@
     <main class="sheet">
       <div class="page-host" bind:this={pageHost}></div>
     </main>
-    <aside id="shelf" class="shelf side" hidden={!prefs.panelOpen} aria-label="Side panel">
+    {#if prefs.panelOpen}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="shelf-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-controls="shelf"
+        aria-label="Side panel width"
+        aria-valuemin={PANEL_MIN}
+        aria-valuemax={PANEL_MAX}
+        aria-valuenow={panelWidth}
+        tabindex="0"
+        title="Drag to change the side panel's width; double-click for the usual width"
+        onpointerdown={startResize}
+        onkeydown={resizeKey}
+        ondblclick={() => (prefs.panelWidth = PANEL_DEFAULT)}></div>
+    {/if}
+    <aside id="shelf" class="shelf side" hidden={!prefs.panelOpen} aria-label="Side panel" style:width="{panelWidth}px">
       <SidePanel bind:tab={prefs.panelTab}>
         {#snippet status()}
           <p class="hint status-hint">Keep track of anything here: health, supplies, threads, people. Tables and rolls work here too.</p>
@@ -465,6 +565,20 @@
           <button type="button" class="link-button" data-choice="cancel" onclick={() => resolveDuplicate(null)}>Cancel</button>
         </div>
       </div>
+    </div>
+  {/if}
+
+  {#if namePrompt}
+    <div class="dialog-backdrop">
+      <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="name-title" onsubmit={(ev) => (ev.preventDefault(), answerName(nameValue))}>
+        <h2 id="name-title">Save as</h2>
+        <p>This browser saves a copy into your downloads under this name.</p>
+        <input class="file-name" bind:this={nameInput} bind:value={nameValue} aria-label="File name" onkeydown={(ev) => ev.key === "Escape" && answerName(null)} />
+        <div class="form-actions">
+          <button type="submit" class="open-folder" data-choice="save">Save</button>
+          <button type="button" class="link-button" data-choice="cancel" onclick={() => answerName(null)}>Cancel</button>
+        </div>
+      </form>
     </div>
   {/if}
 

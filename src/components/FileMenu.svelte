@@ -6,6 +6,8 @@
   let {
     journals,
     currentId,
+    currentFile,
+    canWrite,
     oncreate,
     onswitch,
     onbrowse,
@@ -17,6 +19,10 @@
   }: {
     journals: JournalSummary[];
     currentId: string | null;
+    /** The file the open journal belongs to, when it has one (Chrome, Edge). */
+    currentFile: string | null;
+    /** Whether this browser can write to a file at all; elsewhere both saves download. */
+    canWrite: boolean;
     oncreate: () => void;
     onswitch: (id: string) => void;
     onbrowse: () => void;
@@ -69,8 +75,10 @@
       </div>
 
       <hr />
-      <button type="button" role="menuitem" class="menu-item" data-action="save" onmouseenter={() => (sub = null)} onclick={run(onsave)}><span>Save to a file</span><span class="when">{mod}Shift+S</span></button>
-      <button type="button" role="menuitem" class="menu-item" data-action="saveas" onmouseenter={() => (sub = null)} onclick={run(onsaveas)}><span>Save as…</span></button>
+      <button type="button" role="menuitem" class="menu-item" data-action="save" title={currentFile ? `Writes to ${currentFile}` : undefined} onmouseenter={() => (sub = null)} onclick={run(onsave)}>
+        <span class="save-label">{#if currentFile}Save to <em>{currentFile}</em>{:else if canWrite}Save to a file…{:else}Download a copy{/if}</span><span class="when">{mod}S</span>
+      </button>
+      <button type="button" role="menuitem" class="menu-item" data-action="saveas" onmouseenter={() => (sub = null)} onclick={run(onsaveas)}><span>Save as…</span><span class="when">{mod}Shift+S</span></button>
       <hr />
 
       <div class="has-sub" role="none" onmouseenter={() => (sub = "export")}>

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Save and Save as work like a word processor's.** In Chrome and Edge a
+  journal belongs to a file: Save (now Ctrl+S) writes back to it without
+  asking, also after a reload; Save as (Ctrl+Shift+S) asks and makes the new
+  file the journal's; opening a journal file makes that file the journal's,
+  while a copy kept beside one starts with none. The File menu names the
+  file. In Firefox and Safari both download a copy, and Save as asks for the
+  name first.
+- **The side panel can be made wider or narrower**: drag its left edge, or
+  click the edge and use the arrow keys (Shift for bigger steps). A
+  double-click puts it back to the usual width. The width is remembered in
+  this browser, and the page always keeps at least 40% of the window.
 - **A journal keeps a copy of its folders.** With folders chosen, the journal
   holds those folders' oracles (and what they go to or refer to), so it rolls
   on a computer without Orangey: save it to a file, open it in

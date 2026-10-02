@@ -747,7 +747,7 @@ mark { color: inherit; border-radius: 2px; padding: 0 0.05em; }
 /* --- printing: the story alone --------------------------------------------------------- */
 
 @media print {
-  .topbar, .toolbar, .shelf, .toast, .notice, .chip-popover, .slash-menu { display: none !important; }
+  .topbar, .toolbar, .shelf, .shelf-resizer, .toast, .notice, .chip-popover, .slash-menu { display: none !important; }
   html, body, .app, .body, .sheet { height: auto; overflow: visible; background: #fff; color: #000; }
   .page { max-width: none; padding: 0; font-size: 12pt; }
   .chip { background: none; box-shadow: none; padding: 0; color: inherit; }
@@ -781,3 +781,34 @@ mark { color: inherit; border-radius: 2px; padding: 0 0.05em; }
 /* A roll from a pack: its credit in the chip's pop-up. */
 .chip-popover .credit { margin: 0 0 0.5rem; font-size: 0.75rem; color: var(--ink-soft); }
 .chip-popover .credit a { color: inherit; }
+
+/* The side panel's left edge, dragged to change its width. */
+.shelf-resizer {
+  flex: none;
+  width: 7px;
+  margin-right: -4px;
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  transition: background 0.15s;
+}
+.shelf-resizer:hover,
+.shelf-resizer:focus-visible,
+.app.resizing .shelf-resizer {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  outline: none;
+}
+.shelf { flex: none; }
+/* While dragging, text is not selected and the cursor stays the same everywhere. */
+.app.resizing { cursor: col-resize; user-select: none; }
+@media (max-width: 40rem) {
+  .shelf-resizer { display: none; }
+  .shelf { width: auto !important; }
+}
+
+/* Save to <the journal's file>: the name may be long. */
+.file-menu .save-label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-menu .save-label em { font-style: normal; font-weight: 600; }
+.dialog .file-name { width: 100%; font: inherit; padding: 0.35rem 0.5rem; margin: 0.25rem 0 0.75rem; }
