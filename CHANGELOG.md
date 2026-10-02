@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Copy and paste carries the look.** Ctrl+C on the page now gives Word,
+  Google Docs or an email the highlights, colours, sizes and typefaces as
+  they look here, and the inkblots as pictures (full size where put in the
+  text, small where a chip sits). Pasted back into Sekwe it is still chips
+  and blots. This replaces the web page export.
+- **Markdown export with pictures**: with inkblots put in the text, Export
+  as Markdown downloads a ZIP of the `.md` and one picture per inkblot,
+  linked from the text; without any, the plain `.md` as before. The File
+  menu's Export is now this one item.
 - **Orangey's boards are commands.** Each board in the journal's folders is
   offered in the `/` menu (`/tonights-table`) and rolls everything on it, one
   chip each. The Commands panel lists them under "From your Orangey boards",

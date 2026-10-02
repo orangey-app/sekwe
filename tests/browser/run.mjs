@@ -858,7 +858,6 @@ await test("V a journal saved as a file opens again: as a copy beside the origin
 
   // Exports land as files too.
   await page.click(".file-menu .menu-button");
-  await page.click('.file-menu [data-action="export"]');
   await page.click('.file-menu [data-action="markdown"]');
   const md = join(dir, "untitled-journal-2.md");
   for (let i = 0; i < 100 && !existsSync(md); i++) await new Promise((r) => setTimeout(r, 50));
@@ -1018,6 +1017,73 @@ await test("V2 a journal is deleted from File, after a warning that says whether
   // After a reload it is still gone.
   await open(page);
   assert.equal(await page.evaluate(`return window.sekwe.session.view().journals.length`), 1);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+/** A doc with a highlighted word, a coloured word, an inkblot chip and an inkblot put in the text. */
+const STYLED = {
+  type: "doc",
+  content: [
+    { type: "paragraph", content: [
+      { type: "text", text: "Lit", marks: [{ type: "highlight", attrs: { highlight: "yellow" } }] },
+      { type: "text", text: " and " },
+      { type: "text", text: "red", marks: [{ type: "textColour", attrs: { colour: "red" } }] },
+      { type: "text", text: " " },
+      { type: "roll", attrs: { record: { source: { kind: "oracle", id: "ink", name: "Inkblot", version: "v" }, results: [{ text: "generated", blot: 4242, at: "2026-10-02T00:00:00.000Z" }] } } },
+    ] },
+    { type: "inkblot", attrs: { blot: 4242, from: "Inkblot" } },
+    { type: "paragraph" },
+  ],
+};
+
+await test("Ctrl+C copies rich text that keeps its look and its inkblot pictures, and pastes back into Sekwe as it was", async (page) => {
+  await open(page);
+  await page.evaluate(`window.sekwe.editor.commands.setContent(${JSON.stringify(STYLED)}); window.sekwe.editor.commands.selectAll();`);
+  const html = await page.evaluate(`
+    const data = new DataTransfer();
+    window.sekwe.editor.view.dom.dispatchEvent(new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }));
+    return data.getData("text/html");
+  `);
+  assert.match(html, /<mark[^>]*style="background-color: rgb\(251, 238, 166\);?"[^>]*>Lit<\/mark>/);
+  assert.match(html, /<span[^>]*style="color: rgb\(179, 38, 30\);?"[^>]*>red<\/span>/);
+  assert.equal((html.match(/<img [^>]*src="data:image\/png;base64,/g) ?? []).length, 2, "the chip and the picture did not both become images");
+  assert.match(html, /data-blot="4242"/);
+  // Pasted into Sekwe, it is chips and a blot again.
+  await page.evaluate(`
+    window.sekwe.editor.commands.setContent({ type: "doc", content: [{ type: "paragraph" }] });
+    const data = new DataTransfer();
+    data.setData("text/html", ${JSON.stringify(html)});
+    window.sekwe.editor.view.dom.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  `);
+  const types = await page.evaluate(`const t = []; window.sekwe.editor.state.doc.descendants((n) => { t.push(n.type.name + (n.marks.length ? ":" + n.marks.map((m) => m.type.name).join(",") : "")); }); return t;`);
+  assert.ok(types.includes("roll"), `no chip after pasting back: ${types}`);
+  assert.ok(types.includes("inkblot"), `no blot after pasting back: ${types}`);
+  assert.ok(types.includes("text:highlight"), `the highlight was lost: ${types}`);
+  assert.deepEqual(page.consoleErrors, []);
+});
+
+await test("Export as Markdown is a ZIP with a picture for each inkblot put in the text; without one, a plain .md", async (page) => {
+  await open(page);
+  await page.evaluate(`window.sekwe.editor.commands.setContent(${JSON.stringify(STYLED)});`);
+  const dir = join(root, ".tmp", "md");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="markdown"]');
+  const zip = join(dir, "untitled-journal.zip");
+  for (let i = 0; i < 100 && !existsSync(zip); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(existsSync(zip), "no ZIP was downloaded");
+  const bytes = readFileSync(zip);
+  assert.ok(bytes.includes(Buffer.from("untitled-journal.md")) && bytes.includes(Buffer.from("inkblot-4242.png")), "the ZIP lacks the Markdown or the picture");
+  // Without an inkblot in the text: the plain file.
+  await page.evaluate(`window.sekwe.editor.commands.setContent({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Plain." }] }] });`);
+  await page.click(".file-menu .menu-button");
+  await page.click('.file-menu [data-action="markdown"]');
+  const md = join(dir, "untitled-journal.md");
+  for (let i = 0; i < 100 && !existsSync(md); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(readFileSync(md, "utf8"), /Plain\./);
+  rmSync(dir, { recursive: true, force: true });
   assert.deepEqual(page.consoleErrors, []);
 });
 

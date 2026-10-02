@@ -46,6 +46,19 @@ export function download(name: string, text: string, mime: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** Bytes as a download (the Markdown export's ZIP). */
+export function downloadBytes(name: string, bytes: Uint8Array, mime: string): void {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.style.display = "none";
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 /** Whether this browser can write back to a file on disk (Chrome, Edge). */
 export const canWriteFiles = (): boolean => typeof (window as PickerWindow).showSaveFilePicker === "function";
 

@@ -44,7 +44,9 @@ Read this first when picking the work up again.
 - Chip menu: copy a link to the oracle, open it in Orangey.
 - Boards in the slash menu: roll every oracle on one, or leave them out.
 - Deleting a journal (opening files as copies adds journals).
-- Export images: the inkblot picture as an image in the web page export.
+- Language support (per-journal language for spellcheck, right-to-left
+  paragraphs, `/` after CJK text, optional Noto typeface): discussed 2 Oct,
+  parked until wanted.
 
 ## Notes for whoever builds next
 

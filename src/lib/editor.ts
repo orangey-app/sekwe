@@ -13,6 +13,8 @@ import { InkblotPicture, RollChip, RollKeys, type RollControl } from "./rollnode
 import { SlashCommand, type SlashSource } from "./slash.ts";
 import { TableExtensions } from "./tables.ts";
 import { MarkExtensions } from "./marks.ts";
+import { copySerializer } from "./clipboard.ts";
+import { blotPicture } from "./blot.ts";
 
 export interface EditorOptions {
   element: HTMLElement;
@@ -28,7 +30,7 @@ export interface EditorOptions {
 }
 
 export function createEditor(o: EditorOptions): Editor {
-  return new Editor({
+  const editor = new Editor({
     element: o.element,
     extensions: [
       StarterKit.configure({
@@ -53,4 +55,7 @@ export function createEditor(o: EditorOptions): Editor {
     onUpdate: () => o.onChange(),
     onTransaction: () => o.onTransaction?.(),
   });
+  // Ctrl+C carries the look and the inkblot pictures, for Word, Docs or email (clipboard.ts).
+  editor.view.setProps({ clipboardSerializer: copySerializer(editor.schema, blotPicture) });
+  return editor;
 }

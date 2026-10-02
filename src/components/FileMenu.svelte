@@ -14,7 +14,6 @@
     onsave,
     onsaveas,
     onmarkdown,
-    onhtml,
     onprint,
     ondelete,
   }: {
@@ -30,13 +29,12 @@
     onsave: () => void;
     onsaveas: () => void;
     onmarkdown: () => void;
-    onhtml: () => void;
     onprint: () => void;
     ondelete: () => void;
   } = $props();
 
   let open = $state(false);
-  let sub: "open" | "export" | null = $state(null);
+  let sub: "open" | null = $state(null);
   let root: HTMLElement;
   const mod = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
   const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -83,15 +81,7 @@
       <button type="button" role="menuitem" class="menu-item" data-action="saveas" onmouseenter={() => (sub = null)} onclick={run(onsaveas)}><span>Save as…</span><span class="when">{mod}Shift+S</span></button>
       <hr />
 
-      <div class="has-sub" role="none" onmouseenter={() => (sub = "export")}>
-        <button type="button" role="menuitem" class="menu-item" data-action="export" aria-haspopup="menu" aria-expanded={sub === "export"} onclick={() => (sub = sub === "export" ? null : "export")}><span>Export</span><span class="when">▸</span></button>
-        {#if sub === "export"}
-          <div class="menu sub-menu" role="menu" aria-label="Export">
-            <button type="button" role="menuitem" class="menu-item" data-action="markdown" onclick={run(onmarkdown)}><span>Markdown</span></button>
-            <button type="button" role="menuitem" class="menu-item" data-action="html" onclick={run(onhtml)}><span>Web page</span></button>
-          </div>
-        {/if}
-      </div>
+      <button type="button" role="menuitem" class="menu-item" data-action="markdown" title="Copying the text (Ctrl+A, Ctrl+C) gives rich text for Word or Google Docs" onmouseenter={() => (sub = null)} onclick={run(onmarkdown)}><span>Export as Markdown</span></button>
 
       <button type="button" role="menuitem" class="menu-item" data-action="print" onmouseenter={() => (sub = null)} onclick={run(onprint)}><span>Print, or save as PDF</span><span class="when">{mod}P</span></button>
       <hr />

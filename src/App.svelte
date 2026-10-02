@@ -19,8 +19,10 @@
   import type { Board } from "./lib/oracles.ts";
   import { RollControl } from "./lib/rollnodes.ts";
   import { pickAtCursor, type SlashItem, type SlashSource } from "./lib/slash.ts";
-  import { fileStem, FILE_SUFFIX, outline, toFile, toHtml, toMarkdown, type OutlineEntry } from "./lib/export.ts";
-  import { canWriteFiles, fileFor, forgetFile, openText, rememberFile, saveText, download, type FileHandle } from "./lib/files.ts";
+  import { blotFile, blotsIn, fileStem, FILE_SUFFIX, outline, toFile, toMarkdown, type OutlineEntry } from "./lib/export.ts";
+  import { blotPng } from "./lib/blot.ts";
+  import { createZip, type ZipEntry } from "../vendor/orangey/src/storage/zip.ts";
+  import { canWriteFiles, fileFor, forgetFile, openText, rememberFile, saveText, download, downloadBytes, type FileHandle } from "./lib/files.ts";
   import { clampPanelWidth, loadPrefs, PANEL_DEFAULT, PANEL_MAX, PANEL_MIN, savePrefs, WIDTHS, type PageWidth } from "./lib/prefs.ts";
   import type { JournalCommand } from "./lib/journal.ts";
   import type { RollRecord } from "./lib/rolls.ts";
@@ -430,12 +432,27 @@
     }
   }
 
-  async function exportAs(kind: "markdown" | "html") {
+  /**
+   * Markdown: one .md file; with inkblots put in the text, a ZIP of the .md and
+   * a picture for each (Markdown cannot hold pictures itself).
+   */
+  async function exportMarkdown() {
     const j = await session.current();
     if (!j) return;
-    if (kind === "markdown") download(`${fileStem(j.title)}.md`, toMarkdown(j), "text/markdown");
-    else download(`${fileStem(j.title)}.html`, toHtml(j), "text/html");
-    say(kind === "markdown" ? "The Markdown file is in your downloads." : "The web page is in your downloads.");
+    const stem = fileStem(j.title);
+    const blots = blotsIn(j.doc, j.status);
+    if (blots.length === 0) {
+      download(`${stem}.md`, toMarkdown(j), "text/markdown");
+      say("The Markdown file is in your downloads.");
+      return;
+    }
+    const entries: ZipEntry[] = [{ path: `${stem}.md`, text: toMarkdown(j, { pictures: true }) }];
+    for (const b of blots) {
+      const bytes = await blotPng(b, 1200);
+      if (bytes) entries.push({ path: blotFile(b), bytes });
+    }
+    downloadBytes(`${stem}.zip`, await createZip(entries), "application/zip");
+    say(`The Markdown and ${blots.length} inkblot picture${blots.length === 1 ? "" : "s"} are in your downloads, as ${stem}.zip.`);
   }
 
   function print() {
@@ -494,8 +511,7 @@
       canWrite={canWriteFiles()}
       onsave={() => saveToFile()}
       onsaveas={() => saveToFile(true)}
-      onmarkdown={() => exportAs("markdown")}
-      onhtml={() => exportAs("html")}
+      onmarkdown={exportMarkdown}
       onprint={print}
       ondelete={askDelete} />
     <input

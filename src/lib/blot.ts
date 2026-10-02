@@ -52,4 +52,35 @@ export async function drawBlot(canvas: HTMLCanvasElement, seed: number, width: n
   return true;
 }
 
+/** Pictures already drawn for a copy, by blot and width: a copy drawn twice costs nothing. */
+const pictures = new Map<string, string>();
+
+/**
+ * An inkblot as a PNG data address, drawn at once (for the clipboard): the
+ * same picture as on the page, at `width` pixels. Null where no canvas works.
+ */
+export function blotPicture(seed: number, width: number): string | null {
+  const key = `${seed}:${width}`;
+  const known = pictures.get(key);
+  if (known) return known;
+  try {
+    const canvas = document.createElement("canvas");
+    drawBlotNow(canvas, seed, width);
+    const url = canvas.toDataURL("image/png");
+    if (pictures.size > 64) pictures.clear();
+    pictures.set(key, url);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** The same picture as PNG bytes, for a file (the Markdown export's ZIP). */
+export async function blotPng(seed: number, width: number): Promise<Uint8Array | null> {
+  const canvas = document.createElement("canvas");
+  drawBlotNow(canvas, seed, width);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+}
+
 export { inkHeight };

@@ -11,7 +11,7 @@ account, and it works offline.
 
 **Status:** journals with chapters, a status panel, tables and text styling;
 oracles from your Orangey library roll into the text and the status panel;
-journals save to files and export as Markdown, a web page or PDF. Works
+journals save to files and export as Markdown or PDF, and copy as rich text. Works
 offline. `docs/STATUS.md` says where the work stands; the plan and the decisions behind it are in the project's plan
 document.
 
@@ -52,7 +52,8 @@ the same address. That is what `serve:both` is for when trying it locally.
 The *File* menu works like a word processor's: **New journal**; **Open**, with
 your recent journals and **Browse for a journal file…** (Ctrl+O; a journal
 already here can be replaced or kept beside the copy); **Save** (Ctrl+S) and
-**Save as…** (Ctrl+Shift+S); **Export** as Markdown or a web page; and
+**Save as…** (Ctrl+Shift+S); **Export as Markdown** (a ZIP with a picture
+for each inkblot, when there are any); and
 **Print, or save as PDF** (Ctrl+P).
 
 In Chrome and Edge a journal belongs to a file on disk. Save writes straight
@@ -69,6 +70,10 @@ moving to another browser, loses whatever was not saved to a file. Exports put e
 words in the text with a footnote naming its oracle and earlier results, and
 add the status panel at the end. A journal file holds the copies of the
 oracles it rolled, so it re-rolls on any computer.
+
+To put the story into Word, Google Docs or an email, select it (Ctrl+A) and
+copy (Ctrl+C): the copy keeps headings, styling and colours, and the inkblots
+come as pictures. Rolls paste as their words, without the footnotes.
 
 ## Rolling
 

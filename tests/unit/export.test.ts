@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { fileStem, rollNote, toFile, toHtml, toMarkdown } from "../../src/lib/export.ts";
+import { blotFile, blotsIn, fileStem, rollNote, toFile, toMarkdown } from "../../src/lib/export.ts";
 import { isJournal, newJournal, type DocJSON } from "../../src/lib/journal.ts";
 import type { RollRecord } from "../../src/lib/rolls.ts";
 
@@ -68,18 +68,11 @@ describe("exporting a journal", () => {
     assert.doesNotMatch(md, /\[\^|Status|HP 12/);
   });
 
-  test("HTML is a page of its own: escaped, styled, with numbered notes", () => {
+  test("with pictures, an inkblot put in the text links its picture; blotsIn lists them once each", () => {
     const j = journal();
-    j.title = "Salt & <Iron>";
-    const html = toHtml(j);
-    assert.match(html, /^<!doctype html>/);
-    assert.match(html, /<title>Salt &amp; &lt;Iron&gt;<\/title>/);
-    assert.match(html, /<h2>Chapter One<\/h2>/, "a chapter sits under the page's own title");
-    assert.match(html, /<span class="roll">Fog<\/span><sup><a href="#note-1" id="ref-1">1<\/a><\/sup>/);
-    assert.match(html, /<mark class="hl-yellow">marked<\/mark>/);
-    assert.match(html, /<th><p>Item<\/p><\/th>/);
-    assert.match(html, /<li id="note-1">Weather; earlier: Rain/);
-    assert.doesNotMatch(html, /<script/);
+    assert.match(toMarkdown(j, { pictures: true }), /!\[Inkblot #4242\]\(inkblot-4242\.png\)/);
+    assert.deepEqual(blotsIn(j.doc, j.status, { type: "doc", content: [{ type: "inkblot", attrs: { blot: 4242 } }, { type: "inkblot", attrs: { blot: 7 } }] }), [4242, 7]);
+    assert.equal(blotFile(7), "inkblot-7.png");
   });
 
   test("a picked roll says so in its note", () => {
@@ -106,14 +99,11 @@ describe("credit for packs", () => {
     const md = toMarkdown(j, { notes: false });
     assert.equal(md.match(/Oracles from/g)?.length, 1);
     assert.match(md, /---\n\nOracles from Delve by A\. Writer · v1\.0 · CC BY 4\.0 \(<https:\/\/example\.org\/delve>\)\.\n$/);
-    const html = toHtml(j);
-    assert.match(html, /<p class="credits">Oracles from Delve by A\. Writer · v1\.0 · CC BY 4\.0 \(<a href="https:\/\/example\.org\/delve">web page<\/a>\)\.<\/p>/);
   });
 
   test("no packs, no credit line; a homepage that is not a web address is not made a link", () => {
     assert.doesNotMatch(toMarkdown({ ...j, doc: doc }), /Oracles from/);
     const odd = { ...j, doc: { type: "doc", content: [{ type: "paragraph", content: [{ type: "roll", attrs: { record: { ...fromPack("x"), source: { ...fromPack("x").source, pack: { ...pack, homepage: "javascript:alert(1)" } } } } }] }] } as DocJSON };
-    assert.doesNotMatch(toHtml(odd), /javascript:/);
     assert.doesNotMatch(toMarkdown(odd), /javascript:/);
   });
 });

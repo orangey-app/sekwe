@@ -1,6 +1,6 @@
 /**
- * A journal as Markdown, as a web page, and as the file Sekwe saves and
- * opens. Written from the stored document (Tiptap JSON), not from the screen,
+ * A journal as Markdown, and as the file Sekwe saves and opens. (Rich text
+ * for Word or Docs is Ctrl+C: clipboard.ts.) Written from the stored document (Tiptap JSON), not from the screen,
  * so it runs and is tested without a browser.
  *
  * A roll exports as the words it shows. With `notes` on (the default), each
@@ -14,6 +14,11 @@ import type { DocJSON, Journal } from "./journal.ts";
 export interface ExportOptions {
   /** Footnotes naming each roll's oracle and earlier results. */
   notes?: boolean;
+  /**
+   * Inkblots put in the text as pictures: `![Inkblot #42](inkblot-42.png)`,
+   * the files going beside the Markdown (blotsIn lists them). Off: a line of text.
+   */
+  pictures?: boolean;
   /** The status panel, after the story under its own heading. */
   status?: boolean;
 }
@@ -55,6 +60,20 @@ class Credits {
 /** "Delve by A. Writer · v1.0 · CC BY 4.0", as the credit at the end says it. */
 export function creditText(p: PackCredit): string {
   return [`${p.title} by ${p.author}`, `v${p.version}`, p.licence].filter(Boolean).join(" · ");
+}
+
+/** The file an inkblot's picture is saved as, beside the Markdown. */
+export const blotFile = (blot: number) => `inkblot-${blot}.png`;
+
+/** The inkblots put in the text (not the chips), in order, once each: the pictures a Markdown export needs. */
+export function blotsIn(...docs: (DocJSON | undefined)[]): number[] {
+  const out: number[] = [];
+  const walk = (n: PMNode) => {
+    if (n.type === "inkblot" && typeof n.attrs?.blot === "number" && !out.includes(n.attrs.blot)) out.push(n.attrs.blot);
+    kids(n).forEach(walk);
+  };
+  for (const d of docs) if (d) walk(d as unknown as PMNode);
+  return out;
 }
 
 // --- Markdown --------------------------------------------------------------------------
@@ -122,7 +141,7 @@ class MarkdownWriter {
       case "codeBlock":
         return "```\n" + kids(n).map((t) => t.text ?? "").join("") + "\n```";
       case "inkblot":
-        return `*[Inkblot #${n.attrs?.blot}]*`;
+        return this.#opts.pictures && n.attrs?.blot ? `![Inkblot #${n.attrs.blot}](${blotFile(Number(n.attrs.blot))})` : `*[Inkblot #${n.attrs?.blot}]*`;
       case "table": {
         const rows = kids(n).map((row) => kids(row).map((cell) => kids(cell).map((p) => this.inline(kids(p))).join(" ").replace(/\n/g, " ")));
         if (rows.length === 0) return "";
@@ -156,131 +175,6 @@ export function toMarkdown(j: Journal, opts: ExportOptions = {}): string {
   }
   if (w.notes.length) out += "\n\n" + w.notes.map((n, i) => `[^${i + 1}]: ${n}`).join("\n");
   return out + "\n";
-}
-
-// --- HTML ------------------------------------------------------------------------------
-
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-class HtmlWriter {
-  notes: string[] = [];
-  credits = new Credits();
-  #opts: ExportOptions;
-  constructor(opts: ExportOptions) {
-    this.#opts = opts;
-  }
-
-  node(n: PMNode): string {
-    const inner = () => kids(n).map((c) => this.node(c)).join("");
-    switch (n.type) {
-      case "doc":
-        return inner();
-      case "text": {
-        let t = esc(n.text ?? "");
-        for (const m of n.marks ?? []) {
-          const a = m.attrs ?? {};
-          if (m.type === "bold") t = `<strong>${t}</strong>`;
-          else if (m.type === "italic") t = `<em>${t}</em>`;
-          else if (m.type === "strike") t = `<s>${t}</s>`;
-          else if (m.type === "code") t = `<code>${t}</code>`;
-          else if (m.type === "highlight" && a.highlight) t = `<mark class="hl-${esc(String(a.highlight))}">${t}</mark>`;
-          else if (m.type === "textColour" && a.colour) t = `<span class="tc-${esc(String(a.colour))}">${t}</span>`;
-          else if (m.type === "fontSize" && a.size) t = `<span class="fs-${esc(String(a.size))}">${t}</span>`;
-          else if (m.type === "fontFamily" && a.font) t = `<span class="ff-${esc(String(a.font))}">${t}</span>`;
-        }
-        return t;
-      }
-      case "hardBreak":
-        return "<br>";
-      case "paragraph":
-        return `<p>${inner()}</p>`;
-      case "heading": {
-        const l = Math.min(6, Math.max(1, Number(n.attrs?.level ?? 1) + 1));
-        return `<h${l}>${inner()}</h${l}>`;
-      }
-      case "blockquote":
-        return `<blockquote>${inner()}</blockquote>`;
-      case "horizontalRule":
-        return `<hr>`;
-      case "bulletList":
-        return `<ul>${inner()}</ul>`;
-      case "orderedList":
-        return `<ol>${inner()}</ol>`;
-      case "listItem":
-        return `<li>${inner()}</li>`;
-      case "codeBlock":
-        return `<pre><code>${inner()}</code></pre>`;
-      case "table":
-        return `<table>${inner()}</table>`;
-      case "tableRow":
-        return `<tr>${inner()}</tr>`;
-      case "tableHeader":
-        return `<th>${inner()}</th>`;
-      case "tableCell":
-        return `<td>${inner()}</td>`;
-      case "inkblot":
-        return `<figure class="blot">[Inkblot #${esc(String(n.attrs?.blot ?? ""))}]</figure>`;
-      case "roll": {
-        const record = n.attrs?.record as RollRecord | null;
-        if (!record) return "";
-        const text = esc(chipText(current(record)));
-        this.credits.note(record);
-        if (!this.#opts.notes) return `<span class="roll">${text}</span>`;
-        this.notes.push(rollNote(record));
-        const k = this.notes.length;
-        return `<span class="roll">${text}</span><sup><a href="#note-${k}" id="ref-${k}">${k}</a></sup>`;
-      }
-      default:
-        return inner();
-    }
-  }
-}
-
-const PAGE_CSS = `
-body { font: 18px/1.6 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; color: #26251f; background: #fffefb; max-width: 44rem; margin: 3rem auto; padding: 0 1.25rem; }
-h1 { font-size: 2rem; margin-bottom: 2rem; } h2 { font-size: 1.6rem; margin-top: 2.5em; } h3 { font-size: 1.3rem; margin-top: 2em; } h4 { font-size: 1.1rem; }
-blockquote { margin: 0 0 1em; padding-left: 1em; border-left: 3px solid #e2dfd6; color: #6b6960; }
-hr { border: none; text-align: center; margin: 2em 0; } hr::after { content: "⁂"; color: #6b6960; }
-table { border-collapse: collapse; margin: 1em 0; } th, td { border: 1px solid #d8d4c8; padding: .3em .6em; text-align: left; vertical-align: top; } th { background: #f1efe8; } td p, th p { margin: 0; }
-.roll { background: #e9eef3; border-radius: 3px; padding: 0 .25em; } sup a { text-decoration: none; color: #3a5a7a; font-size: .75em; }
-.notes { margin-top: 3em; border-top: 1px solid #e2dfd6; font-size: .85em; color: #6b6960; }
-.hl-yellow { background: #fbeea6; } .hl-green { background: #cdeec4; } .hl-blue { background: #cfe3f6; } .hl-pink { background: #f7d1e1; }
-.tc-red { color: #b3261e; } .tc-orange { color: #b45309; } .tc-green { color: #2e7d32; } .tc-blue { color: #1d5fa8; } .tc-purple { color: #7b3fa0; } .tc-grey { color: #6b6960; }
-.fs-small { font-size: .85em; } .fs-large { font-size: 1.25em; } .fs-larger { font-size: 1.6em; }
-.ff-sans { font-family: system-ui, sans-serif; } .ff-mono { font-family: ui-monospace, "Courier New", monospace; }
-.blot { color: #6b6960; font-style: italic; text-align: center; }
-.status { margin-top: 3em; border-top: 1px solid #e2dfd6; }
-.credits { margin-top: 3em; font-size: .85em; color: #6b6960; }
-`;
-
-export function toHtml(j: Journal, opts: ExportOptions = {}): string {
-  const o = { notes: true, status: true, ...opts };
-  const w = new HtmlWriter(o);
-  const story = w.node(j.doc as unknown as PMNode);
-  const status = o.status && j.status && hasText(j.status) ? `<section class="status"><h2>Status</h2>${w.node(j.status as unknown as PMNode)}</section>` : "";
-  const notes = w.notes.length
-    ? `<section class="notes"><ol>${w.notes.map((n, i) => `<li id="note-${i + 1}">${esc(n)} <a href="#ref-${i + 1}">↩</a></li>`).join("")}</ol></section>`
-    : "";
-  const credits = w.credits.all.length
-    ? `<p class="credits">Oracles from ${w.credits.all.map((p) => esc(creditText(p)) + (p.homepage && /^https?:\/\//i.test(p.homepage) ? ` (<a href="${esc(p.homepage)}">web page</a>)` : "")).join("; ")}.</p>`
-    : "";
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(j.title)}</title>
-<style>${PAGE_CSS}</style>
-</head>
-<body>
-<h1>${esc(j.title)}</h1>
-${story}
-${status}
-${credits}
-${notes}
-</body>
-</html>
-`;
 }
 
 // --- the journal file ------------------------------------------------------------------
