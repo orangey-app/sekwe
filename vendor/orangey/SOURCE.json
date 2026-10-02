@@ -1,11 +1,11 @@
 {
   "note": "Copied by scripts/sync-orangey.mjs. Do not edit these files: change Orangey and sync again.",
   "orangey": {
-    "version": "0.8.0",
-    "commit": "b95e3c18fb041517a248f4212355d3559578b9b8",
+    "version": "0.9.0",
+    "commit": "12ccabd6d6ae27e47a6116e2557ce132a58be8be",
     "uncommitted": false
   },
-  "synced": "2026-10-02T11:21:36.173Z",
+  "synced": "2026-10-02T12:24:18.037Z",
   "excluded": {
     "src/model/settings-file.ts": "Orangey's own settings file (scheme, feel, mascot); it checks against timings that live in Orangey's ui/feel.ts"
   },

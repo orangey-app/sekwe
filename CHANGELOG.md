@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — the first release
 
 - **Copy and paste carries the look.** Ctrl+C on the page now gives Word,
   Google Docs or an email the highlights, colours, sizes and typefaces as
