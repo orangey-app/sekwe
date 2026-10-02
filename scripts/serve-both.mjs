@@ -1,9 +1,9 @@
 /**
- * Serves Orangey and Storyboard side by side from one local address, so they
+ * Serves Orangey and Sekwe side by side from one local address, so they
  * share the browser's storage the way they will when published together:
  *
  *   http://127.0.0.1:4321/orangey/      ../orangey/dist   (npm run build there)
- *   http://127.0.0.1:4321/storyboard/   ./dist            (npm run build here)
+ *   http://127.0.0.1:4321/sekwe/   ./dist            (npm run build here)
  *
  *   node scripts/serve-both.mjs [--port 4321] [--orangey <folder>]
  *
@@ -32,16 +32,16 @@ const MIME = {
   ".woff2": "font/woff2",
 };
 
-const INDEX = `<!doctype html><meta charset="utf-8"><title>Orangey and Storyboard</title>
+const INDEX = `<!doctype html><meta charset="utf-8"><title>Orangey and Sekwe</title>
 <style>body{font:16px system-ui;margin:3rem auto;max-width:30rem;line-height:1.5}a{display:block;margin:.5rem 0}</style>
-<h1>Local</h1><a href="orangey/">Orangey</a><a href="storyboard/">Storyboard</a>
+<h1>Local</h1><a href="orangey/">Orangey</a><a href="sekwe/">Sekwe</a>
 <p>Both are served from this one address, so they share this browser's storage.</p>`;
 
 /** One server, a folder per path prefix. A folder's address serves its index.html. */
-export function serveBoth({ orangey, storyboard }) {
+export function serveBoth({ orangey, sekwe }) {
   const mounts = [
     ["/orangey/", orangey],
-    ["/storyboard/", storyboard],
+    ["/sekwe/", sekwe],
   ];
   return createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
@@ -81,16 +81,16 @@ if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   const opt = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
   const port = Number(opt("--port", 4321));
   const orangey = resolve(opt("--orangey", join(here, "..", "orangey")), "dist");
-  const storyboard = join(here, "dist");
+  const sekwe = join(here, "dist");
   for (const [name, dir, how] of [
     ["Orangey", orangey, "run npm run build in the orangey folder"],
-    ["Storyboard", storyboard, "run npm run build here"],
+    ["Sekwe", sekwe, "run npm run build here"],
   ]) {
     if (!existsSync(join(dir, "index.html"))) console.warn(`${name} is not built at ${dir}: ${how}`);
   }
-  serveBoth({ orangey, storyboard }).listen(port, "127.0.0.1", () => {
+  serveBoth({ orangey, sekwe }).listen(port, "127.0.0.1", () => {
     console.log(`Orangey:    http://127.0.0.1:${port}/orangey/`);
-    console.log(`Storyboard: http://127.0.0.1:${port}/storyboard/`);
+    console.log(`Sekwe: http://127.0.0.1:${port}/sekwe/`);
     console.log("Ctrl+C to stop.");
   });
 }

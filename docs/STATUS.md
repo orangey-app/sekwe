@@ -61,6 +61,10 @@ Read this first when picking the work up again.
 
 ## Decisions (2 Oct 2026)
 
+- The app is called **Sekwe** (*sekʷe*, PIE "to tell / to follow"). Renamed
+  everywhere, storage and file format included, with no compatibility for
+  the old Storyboard names (only one journal existed, converted by hand).
+
 - References store ids behind names: `{@Name|id}`; the editor shows `{@Name}`;
   a hand-typed `{@Name}` gets its id when one table has that name.
 - References in shared links stay text (a link carries one wheel, no bundling).

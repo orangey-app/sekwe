@@ -291,7 +291,7 @@ export class Session {
    */
   async importJournal(raw: unknown, choice: ImportChoice = "copy"): Promise<boolean> {
     if (!isJournal(raw)) {
-      this.#problem = "That file is not a Storyboard journal.";
+      this.#problem = "That file is not a Sekwe journal.";
       this.#emit();
       return false;
     }

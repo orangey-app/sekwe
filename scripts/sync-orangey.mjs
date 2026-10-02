@@ -7,10 +7,10 @@
  * What is copied: src/core, src/model, src/import and src/storage — the four
  * folders Orangey's own `npm run check` keeps free of UI code — minus EXCLUDED,
  * plus every unit test (and the fixtures those tests read) whose imports stay
- * inside the copy. The copied tests run in Storyboard's `npm test`, so the
- * engine Storyboard rolls with is tested where it is used. Also HARNESS: the
+ * inside the copy. The copied tests run in Sekwe's `npm test`, so the
+ * engine Sekwe rolls with is tested where it is used. Also HARNESS: the
  * dependency-free Chromium driver Orangey's browser tests use, which
- * Storyboard's browser tests use too.
+ * Sekwe's browser tests use too.
  *
  * vendor/orangey/SOURCE.json records which Orangey it came from and a hash of
  * every file. `npm run check` (verifyVendor below) fails when a vendored file

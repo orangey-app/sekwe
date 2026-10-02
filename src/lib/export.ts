@@ -1,5 +1,5 @@
 /**
- * A journal as Markdown, as a web page, and as the file Storyboard saves and
+ * A journal as Markdown, as a web page, and as the file Sekwe saves and
  * opens. Written from the stored document (Tiptap JSON), not from the screen,
  * so it runs and is tested without a browser.
  *
@@ -285,9 +285,9 @@ ${notes}
 
 // --- the journal file ------------------------------------------------------------------
 
-export const FILE_SUFFIX = ".storyboard.json";
+export const FILE_SUFFIX = ".sekwe.json";
 
-/** The journal as a file: the same object Storyboard stores, pretty-printed. */
+/** The journal as a file: the same object Sekwe stores, pretty-printed. */
 export function toFile(j: Journal): string {
   return `${JSON.stringify(j, null, 2)}\n`;
 }

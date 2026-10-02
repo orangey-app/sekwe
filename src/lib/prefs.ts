@@ -11,7 +11,7 @@ export const WIDTHS: { value: PageWidth; label: string }[] = [
   { value: "full", label: "Full" },
 ];
 
-const KEY = "storyboard:prefs";
+const KEY = "sekwe:prefs";
 
 /** The side panel's width in pixels: dragged by its edge, kept between these. */
 export const PANEL_DEFAULT = 352;

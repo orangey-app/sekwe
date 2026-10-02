@@ -37,7 +37,7 @@ describe("a journal", () => {
     assert.deepEqual(rows.sort(byRecent).map((r) => r.title), ["C", "A", "B"]);
   });
 
-  test("a stored journal from a newer Storyboard still opens, keeping what this one does not know", () => {
+  test("a stored journal from a newer Sekwe still opens, keeping what this one does not know", () => {
     const j = { ...newJournal("Later"), formatVersion: 7, mood: "stormy" };
     assert.ok(isJournal(j));
     assert.equal(isJournal({ ...j, doc: { type: "paragraph" } }), false);

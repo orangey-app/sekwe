@@ -263,7 +263,7 @@
         // Private windows in some browsers refuse IndexedDB. Writing still
         // works; it just will not outlast the tab, and the page says so.
         store = new MemoryStore();
-        storageNote = "This browser is not letting Storyboard keep anything: your writing will be lost when the tab closes. Save it to a file from the File menu.";
+        storageNote = "This browser is not letting Sekwe keep anything: your writing will be lost when the tab closes. Save it to a file from the File menu.";
       }
       if (disposed) return;
       session = new Session(
@@ -298,7 +298,7 @@
       await session.start();
       ready = true;
       if (debug) {
-        (window as unknown as { storyboard: unknown }).storyboard = {
+        (window as unknown as { sekwe: unknown }).sekwe = {
           session,
           store,
           library,
@@ -359,7 +359,7 @@
     const outcome = await saveText(`${fileStem(j.title)}${FILE_SUFFIX}`, toFile(j), "application/json", {
       key: j.id,
       ask,
-      description: "Storyboard journal",
+      description: "Sekwe journal",
       suffix: FILE_SUFFIX,
       extension: ".json",
       askName,
@@ -370,13 +370,13 @@
   }
 
   async function openFile() {
-    const file = await openText(".json,application/json", { description: "Storyboard journal", mime: "application/json", extensions: [".json"] });
+    const file = await openText(".json,application/json", { description: "Sekwe journal", mime: "application/json", extensions: [".json"] });
     if (!file) return;
     let raw: unknown;
     try {
       raw = JSON.parse(file.text);
     } catch {
-      say(`“${file.name}” is not a Storyboard journal.`);
+      say(`“${file.name}” is not a Sekwe journal.`);
       return;
     }
     const id = (raw as { id?: unknown })?.id;

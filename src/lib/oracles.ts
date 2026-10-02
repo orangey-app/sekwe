@@ -1,8 +1,8 @@
 /**
- * The oracles Storyboard can roll: the user's Orangey library, read where
+ * The oracles Sekwe can roll: the user's Orangey library, read where
  * Orangey keeps it, with Orangey's own code (vendor/orangey/src/storage).
  *
- * Storyboard only reads. Orangey stays the one app that writes the library,
+ * Sekwe only reads. Orangey stays the one app that writes the library,
  * so nothing here creates, renames or saves a randomizer.
  */
 
@@ -26,7 +26,7 @@ export interface Oracle {
   pack?: OraclePack;
 }
 
-/** An installed pack's details, as Storyboard keeps them. */
+/** An installed pack's details, as Sekwe keeps them. */
 export interface OraclePack extends PackCredit {
   id: string;
   /** False when its author asks apps not to keep copies of it in journals. */
@@ -53,9 +53,9 @@ export type LibraryStatus =
   /** Not looked for yet. */
   | "idle"
   | "ready"
-  /** Found, but with nothing Storyboard can roll in it. */
+  /** Found, but with nothing Sekwe can roll in it. */
   | "empty"
-  /** Orangey keeps the library in a folder on disk; one click lets Storyboard read it. */
+  /** Orangey keeps the library in a folder on disk; one click lets Sekwe read it. */
   | "needs-folder"
   /** This page cannot see Orangey's storage at all (opened from disk, or storage refused). */
   | "unavailable";
@@ -108,7 +108,7 @@ export class OracleLibrary {
     }
     if (found.folder === "ask") {
       // The browser-storage library Orangey would show meanwhile is not the
-      // user's real one, so Storyboard waits for the folder instead.
+      // user's real one, so Sekwe waits for the folder instead.
       this.#service = null;
       this.#index([]);
       this.status = "needs-folder";

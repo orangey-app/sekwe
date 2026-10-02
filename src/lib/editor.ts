@@ -2,7 +2,7 @@
  * The writing surface: Tiptap with StarterKit, configured for a journal, plus
  * the rolls (chips, inkblot pictures, Alt+R / Alt+N) and the slash command.
  * Headings are chapters, scenes and beats (levels 1 to 3); the journal's title
- * lives outside the text. Tables and text styling are Storyboard's own
+ * lives outside the text. Tables and text styling are Sekwe's own
  * (tables.ts, marks.ts), so nothing beyond StarterKit is installed.
  */
 

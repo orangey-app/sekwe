@@ -140,7 +140,7 @@ describe("packs in the journal", () => {
   });
 });
 
-describe("an installed Orangey pack, read by Storyboard", () => {
+describe("an installed Orangey pack, read by Sekwe", () => {
   test("its oracles carry the pack's credit and its wish about copies", async () => {
     const backend = new MemoryBackend();
     const service = new LibraryService(backend, 0);

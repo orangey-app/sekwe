@@ -85,7 +85,7 @@ describe("rolling", () => {
   const motive = list("m", "Motive", ["Greed", "Debt"]);
   const blot: Rollable = { id: "ink", type: "inkblot", name: "Inkblot" };
 
-  function setup(oracles = [weather, npc, motive, blot], seed = "storyboard") {
+  function setup(oracles = [weather, npc, motive, blot], seed = "sekwe") {
     const library = OracleLibrary.of(oracles.map((r) => oracle(r)));
     const snaps = memorySnapshots();
     const rng = new SeededSource(seed);

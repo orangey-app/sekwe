@@ -165,7 +165,7 @@ describe("a writing session", () => {
     assert.equal(s.view().currentId, file.id);
     assert.equal(textOf(s.editors.live.at(-1)!.doc), "from the file");
     assert.equal(await s.session.importJournal({ hello: "world" }), false);
-    assert.match(s.view().problem!, /not a Storyboard journal/);
+    assert.match(s.view().problem!, /not a Sekwe journal/);
   });
 
   test("the menu lists the journal just saved first", async () => {

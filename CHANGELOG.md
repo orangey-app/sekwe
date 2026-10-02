@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Storyboard is now Sekwe.** The name is everywhere: the page, the
+  single file (`dist/sekwe.html`), the address beside Orangey (`/sekwe/`),
+  journal files (`.sekwe.json`, format `"sekwe-journal"`) and the browser's
+  storage. A clean break before any release: journals kept by the old
+  name do not carry over. A journal file opens after changing its
+  `"format"` line to `"sekwe-journal"`.
 - **Save and Save as work like a word processor's.** In Chrome and Edge a
   journal belongs to a file: Save (now Ctrl+S) writes back to it without
   asking, also after a reload; Save as (Ctrl+Shift+S) asks and makes the new
@@ -16,7 +22,7 @@
 - **A journal keeps a copy of its folders.** With folders chosen, the journal
   holds those folders' oracles (and what they go to or refer to), so it rolls
   on a computer without Orangey: save it to a file, open it in
-  `storyboard.html` from disk, and the slash menu and panel still work. The
+  `sekwe.html` from disk, and the slash menu and panel still work. The
   library here wins and refreshes the copy; with no folders chosen, nothing
   extra is copied. The panel says when it is rolling from the copy.
 - **Pack credit.** Rolls from a pack installed in Orangey carry its credit,
@@ -76,12 +82,12 @@
   screen. It is stored as its number.
 - **The library, read where Orangey keeps it**, with Orangey's own code: the
   browser's storage, or a folder on disk after one click (*Open my Orangey
-  folder*). Storyboard only reads it, and reads it again when its tab comes
+  folder*). Sekwe only reads it, and reads it again when its tab comes
   back, so an edit in Orangey counts from the next roll. Opened from disk,
-  Storyboard says it cannot see the library; dice still roll.
+  Sekwe says it cannot see the library; dice still roll.
 - **Every oracle rolled is copied into the journal** (each version once, with
   the oracle a chain leads to), so a journal re-rolls without the library.
-- **`npm run serve:both`** serves Orangey and Storyboard from one local
+- **`npm run serve:both`** serves Orangey and Sekwe from one local
   address, so they share storage as they will when published.
 
 - **A page to write on.** One screen: the journal's title, a slim toolbar
@@ -96,8 +102,8 @@
   never holds up a keystroke; at once on Ctrl+S, and when the tab is hidden or
   closed. A failed save says so, keeps the words, and retries; a journal is
   never switched away from while its words are unsaved.
-- **Offline.** The site precaches itself (caches named `storyboard-…`, so
-  Orangey's on the same site are never touched), and `storyboard.html` is the
+- **Offline.** The site precaches itself (caches named `sekwe-…`, so
+  Orangey's on the same site are never touched), and `sekwe.html` is the
   whole app in one file that runs from disk. Every path is relative.
 - **Tests.** 29 unit tests of its own (10 of them for the sync) and 8 browser tests: typing and reloading,
   journals, no lost keystrokes during saves, Ctrl+S, offline, a deep folder,
@@ -108,4 +114,4 @@
   DOM-free code in `vendor/orangey/`, made by `scripts/sync-orangey.mjs`,
   which also says when Orangey has moved on (`--status`). `npm run check`
   fails if that copy is edited by hand or imports something it did not bring;
-  `npm test` runs Storyboard's own tests and Orangey's unit tests on the copy.
+  `npm test` runs Sekwe's own tests and Orangey's unit tests on the copy.

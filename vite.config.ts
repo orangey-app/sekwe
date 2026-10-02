@@ -2,7 +2,7 @@
  * Two builds from one config:
  *
  *   vite build                 -> dist/: the site, with an offline worker
- *   vite build --mode single   -> dist/storyboard.html: the whole app in one file,
+ *   vite build --mode single   -> dist/sekwe.html: the whole app in one file,
  *                                 which runs straight from disk
  *
  * `npm run build` runs both, the site first (it empties dist/). Every path is
@@ -14,13 +14,13 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
-/** The single build's page is storyboard.html, beside the site, not over its index. */
+/** The single build's page is sekwe.html, beside the site, not over its index. */
 const renameSingle = (): Plugin => ({
-  name: "storyboard:single-name",
+  name: "sekwe:single-name",
   enforce: "post",
   generateBundle(_, bundle) {
     const page = bundle["index.html"];
-    if (page) page.fileName = "storyboard.html";
+    if (page) page.fileName = "sekwe.html";
   },
 });
 
@@ -36,8 +36,8 @@ export default defineConfig(({ mode }) => {
             registerType: "autoUpdate",
             injectRegister: "script",
             manifest: {
-              name: "Storyboard",
-              short_name: "Storyboard",
+              name: "Sekwe",
+              short_name: "Sekwe",
               description: "A writing page for solo roleplaying games",
               start_url: ".",
               scope: ".",
@@ -47,10 +47,10 @@ export default defineConfig(({ mode }) => {
               icons: [{ src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
             },
             workbox: {
-              // Every cache this worker makes is named "storyboard-…", and old
+              // Every cache this worker makes is named "sekwe-…", and old
               // ones are cleared only within its own scope, so Orangey's caches
               // on the same site are never touched (and Orangey leaves these alone).
-              cacheId: "storyboard",
+              cacheId: "sekwe",
               cleanupOutdatedCaches: true,
               globPatterns: ["**/*.{js,css,html,svg,webmanifest}"],
             },

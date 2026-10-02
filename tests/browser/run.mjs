@@ -17,7 +17,7 @@ import { serveBoth } from "../../scripts/serve-both.mjs";
 
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const dist = join(root, "dist");
-if (!existsSync(join(dist, "index.html")) || !existsSync(join(dist, "storyboard.html"))) {
+if (!existsSync(join(dist, "index.html")) || !existsSync(join(dist, "sekwe.html"))) {
   console.error("dist/ is missing or incomplete: run npm run build first");
   process.exit(1);
 }
@@ -55,11 +55,11 @@ async function test(name, fn) {
 // --- helpers ------------------------------------------------------------------
 
 const open = (page, base = `${server.origin}/`) => page.goto(`${base}index.html?debug`).then(() => ready(page));
-const ready = (page) => page.waitForFunction("window.storyboard && document.querySelector('.app.ready') && window.storyboard.editor");
+const ready = (page) => page.waitForFunction("window.sekwe && document.querySelector('.app.ready') && window.sekwe.editor");
 
 /** Real key events, one character at a time, as a person types. */
 async function typeText(page, text, { pauseEvery = 0, pauseMs = 0 } = {}) {
-  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await page.evaluate(`window.sekwe.editor.commands.focus("end")`);
   // Tiptap moves the focus on the next frame; keys sent before that land elsewhere.
   await page.waitForFunction(`document.activeElement === document.querySelector(".page")`);
   let n = 0;
@@ -72,12 +72,12 @@ async function typeText(page, text, { pauseEvery = 0, pauseMs = 0 } = {}) {
 
 const pageText = (page) => page.evaluate(`return document.querySelector(".page").textContent`);
 const saved = (page) =>
-  page.waitForFunction(`document.querySelector(".status").dataset.status === "saved" && !window.storyboard.session.dirty`);
+  page.waitForFunction(`document.querySelector(".status").dataset.status === "saved" && !window.sekwe.session.dirty`);
 /** The journal as stored in IndexedDB, read past the app. */
 const storedText = (page, id) =>
   page.evaluate(`
-    const id = ${id ? JSON.stringify(id) : "window.storyboard.session.view().currentId"};
-    const j = await window.storyboard.store.get(id);
+    const id = ${id ? JSON.stringify(id) : "window.sekwe.session.view().currentId"};
+    const j = await window.sekwe.store.get(id);
     const walk = (n) => (n.text ?? "") + (n.content ?? []).map(walk).join("");
     return walk(j.doc);
   `);
@@ -183,40 +183,40 @@ await test("C Ctrl+S saves the journal to its file: it asks where once, then wri
   await fakePickers(page);
   await typeText(page, "Now.");
   await ctrlS(page);
-  await page.waitForFunction(`/Saved to untitled-journal\\.storyboard\\.json/.test(document.querySelector(".toast")?.textContent ?? "")`);
+  await page.waitForFunction(`/Saved to untitled-journal\\.sekwe\\.json/.test(document.querySelector(".toast")?.textContent ?? "")`);
   assert.equal(await pageText(page), "Now.", "Ctrl+S typed into the page");
-  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /"text": "Now\."/);
+  assert.match(await fileText(page, "untitled-journal.sekwe.json"), /"text": "Now\."/);
   // Saved in the browser at once too, not after the pause.
   await saved(page);
 
   // The menu names the file, and Save writes to it without asking.
   await page.click(".file-menu .menu-button");
-  assert.equal(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"] .save-label').textContent.trim()`), "Save to untitled-journal.storyboard.json");
+  assert.equal(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"] .save-label').textContent.trim()`), "Save to untitled-journal.sekwe.json");
   await page.click('.file-menu [data-action="save"]');
   await page.waitForFunction(`window.__picked.save === 1 && /Saved to/.test(document.querySelector(".toast")?.textContent ?? "")`);
   await typeText(page, " Then.");
   await ctrlS(page);
   await page.waitForFunction(`document.querySelector(".toast")?.textContent.startsWith("Saved to")`);
-  for (let i = 0; i < 40 && !/Now\. Then\./.test(await fileText(page, "untitled-journal.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
-  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /Now\. Then\./);
+  for (let i = 0; i < 40 && !/Now\. Then\./.test(await fileText(page, "untitled-journal.sekwe.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "untitled-journal.sekwe.json"), /Now\. Then\./);
   assert.equal(await page.evaluate(`return window.__picked.save`), 1, "Save asked where again");
 
   // After a reload the journal still belongs to its file.
   await open(page);
   await fakePickers(page);
-  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await page.evaluate(`window.sekwe.editor.commands.focus("end")`);
   await typeText(page, " Later.");
   await ctrlS(page);
-  for (let i = 0; i < 40 && !/Later\./.test(await fileText(page, "untitled-journal.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
-  assert.match(await fileText(page, "untitled-journal.storyboard.json"), /Now\. Then\. Later\./);
+  for (let i = 0; i < 40 && !/Later\./.test(await fileText(page, "untitled-journal.sekwe.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "untitled-journal.sekwe.json"), /Now\. Then\. Later\./);
   assert.equal(await page.evaluate(`return window.__picked.save`), 0, "after a reload, Save asked where");
 
   // Save as (Ctrl+Shift+S) asks, and the new file is the journal's from then on.
-  await page.evaluate(`window.__saveAs = "second.storyboard.json"`);
+  await page.evaluate(`window.__saveAs = "second.sekwe.json"`);
   await ctrlS(page, true);
   await page.waitForFunction(`window.__picked.save === 1 && /second/.test(document.querySelector(".toast")?.textContent ?? "")`);
   await page.click(".file-menu .menu-button");
-  assert.match(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"]').textContent`), /Save to second\.storyboard\.json/);
+  assert.match(await page.evaluate(`return document.querySelector('.file-menu [data-action="save"]').textContent`), /Save to second\.sekwe\.json/);
   assert.deepEqual(page.consoleErrors, []);
 });
 
@@ -227,13 +227,13 @@ await test("C a journal opened from its file saves back to that file; kept as a 
   await ctrlS(page);
   await page.waitForFunction(`document.querySelector(".toast")?.textContent.startsWith("Saved to")`);
   // A new journal, then the file opened again: it is the journal already here.
-  await page.evaluate(`window.__openName = "untitled-journal.storyboard.json"`);
+  await page.evaluate(`window.__openName = "untitled-journal.sekwe.json"`);
   await page.click(".file-menu .menu-button");
   await page.click('.file-menu [data-action="open"]');
   await page.click('.file-menu [data-action="browse"]');
   await page.waitForFunction(`document.querySelector(".dialog [data-choice=copy]")`);
   await page.click(".dialog [data-choice=copy]");
-  await page.waitForFunction(`window.storyboard.session.view().journals.length === 2`);
+  await page.waitForFunction(`window.sekwe.session.view().journals.length === 2`);
   // The copy has no file: the menu offers to choose one, and Save asks.
   await page.click(".file-menu .menu-button");
   await page.waitForFunction(`document.querySelector('.file-menu [data-action="save"] .save-label')?.textContent.trim() === "Save to a file…"`);
@@ -241,20 +241,20 @@ await test("C a journal opened from its file saves back to that file; kept as a 
 
   // A journal file that is not here yet: opened, it belongs to its file.
   const other = await page.evaluate(`
-    const j = { ...(await window.storyboard.session.current()), id: "from-disk", title: "From disk" };
-    const h = await (await navigator.storage.getDirectory()).getFileHandle("from-disk.storyboard.json", { create: true });
+    const j = { ...(await window.sekwe.session.current()), id: "from-disk", title: "From disk" };
+    const h = await (await navigator.storage.getDirectory()).getFileHandle("from-disk.sekwe.json", { create: true });
     const w = await h.createWritable(); await w.write(JSON.stringify(j)); await w.close();
-    window.__openName = "from-disk.storyboard.json";
+    window.__openName = "from-disk.sekwe.json";
     return j.id;`);
   await page.click(".file-menu .menu-button");
   await page.click('.file-menu [data-action="open"]');
   await page.click('.file-menu [data-action="browse"]');
-  await page.waitForFunction(`window.storyboard.session.view().currentId === ${JSON.stringify(other)}`);
-  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await page.waitForFunction(`window.sekwe.session.view().currentId === ${JSON.stringify(other)}`);
+  await page.evaluate(`window.sekwe.editor.commands.focus("end")`);
   await typeText(page, " Edited.");
   await ctrlS(page);
-  for (let i = 0; i < 40 && !/Edited\./.test(await fileText(page, "from-disk.storyboard.json")); i++) await new Promise((r) => setTimeout(r, 50));
-  assert.match(await fileText(page, "from-disk.storyboard.json"), /Edited\./);
+  for (let i = 0; i < 40 && !/Edited\./.test(await fileText(page, "from-disk.sekwe.json")); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.match(await fileText(page, "from-disk.sekwe.json"), /Edited\./);
   assert.equal(await page.evaluate(`return window.__picked.save`), 1, "saving a journal opened from its file asked where");
   assert.deepEqual(page.consoleErrors, []);
 });
@@ -276,7 +276,7 @@ await test("C without a file picker (Firefox, Safari), Save as asks for a name a
     input.value = "My Campaign";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     document.querySelector(".dialog [data-choice=save]").click();`);
-  const file = join(dir, "My Campaign.storyboard.json");
+  const file = join(dir, "My Campaign.sekwe.json");
   for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
   assert.ok(existsSync(file), "nothing was downloaded under the name given");
   assert.match(readFileSync(file, "utf8"), /Plain\./);
@@ -284,7 +284,7 @@ await test("C without a file picker (Firefox, Safari), Save as asks for a name a
   assert.deepEqual(page.consoleErrors, []);
 });
 
-await test("D the app opens offline once visited, with its caches all named storyboard-", async (page) => {
+await test("D the app opens offline once visited, with its caches all named sekwe-", async (page) => {
   await open(page);
   assert.equal(await workerActive(page), "activated", "the offline worker never installed");
   await typeText(page, "Written before the storm.");
@@ -298,23 +298,23 @@ await test("D the app opens offline once visited, with its caches all named stor
   }
   const caches = await page.evaluate(`return await caches.keys()`);
   assert.ok(caches.length > 0, "nothing was cached");
-  assert.deepEqual(caches.filter((k) => !k.startsWith("storyboard-")), [], `a cache without the prefix: ${caches}`);
+  assert.deepEqual(caches.filter((k) => !k.startsWith("sekwe-")), [], `a cache without the prefix: ${caches}`);
 });
 
 await test("E the app works from a deep folder, where it may be published", async (page) => {
   const nest = join(root, ".tmp", "deep");
   rmSync(nest, { recursive: true, force: true });
   mkdirSync(join(nest, "tools", "games"), { recursive: true });
-  cpSync(dist, join(nest, "tools", "games", "storyboard"), { recursive: true });
+  cpSync(dist, join(nest, "tools", "games", "sekwe"), { recursive: true });
   const sub = await serve(nest);
   try {
-    const base = `${sub.origin}/tools/games/storyboard/`;
+    const base = `${sub.origin}/tools/games/sekwe/`;
     await open(page, base);
     const styled = await page.evaluate(`return getComputedStyle(document.querySelector(".topbar")).display`);
     assert.equal(styled, "flex", "the stylesheet did not load from the folder");
     assert.equal(await workerActive(page), "activated", "the offline worker never installed from the folder");
     const scope = await page.evaluate(`return new URL((await navigator.serviceWorker.getRegistration()).scope).pathname`);
-    assert.equal(scope, "/tools/games/storyboard/");
+    assert.equal(scope, "/tools/games/sekwe/");
     await typeText(page, "Deep.");
     await saved(page);
     await page.setOffline(true);
@@ -331,7 +331,7 @@ await test("E the app works from a deep folder, where it may be published", asyn
 });
 
 await test("F the single file runs from disk and keeps what is written", async (page) => {
-  const file = `file://${join(dist, "storyboard.html")}?debug`;
+  const file = `file://${join(dist, "sekwe.html")}?debug`;
   await page.goto(file);
   await ready(page);
   await typeText(page, "From a USB stick.");
@@ -371,10 +371,10 @@ async function seedLibrary(page, files = ORACLES) {
   `);
 }
 
-const openSeeded = async (page, seed = "storyboard") => {
+const openSeeded = async (page, seed = "sekwe") => {
   await page.goto(`${server.origin}/index.html?debug&seed=${seed}`);
   await ready(page);
-  await page.waitForFunction(`window.storyboard.library.status !== "idle"`);
+  await page.waitForFunction(`window.sekwe.library.status !== "idle"`);
 };
 
 async function press(page, key, { alt = false, ctrl = false } = {}) {
@@ -400,7 +400,7 @@ async function clickOn(page, selector) {
 const chips = (page) =>
   page.evaluate(`
     const out = [];
-    window.storyboard.editor.state.doc.descendants((n) => {
+    window.sekwe.editor.state.doc.descendants((n) => {
       if (n.type.name === "roll") out.push(n.attrs.record);
     });
     return out;
@@ -417,8 +417,8 @@ await test("G the library is read where Orangey keeps it: oracles, not boards, w
   await open(page);
   await seedLibrary(page);
   await openSeeded(page);
-  assert.equal(await page.evaluate(`return window.storyboard.library.status`), "ready");
-  assert.deepEqual(await page.evaluate(`return window.storyboard.library.oracles.map((o) => o.name).sort()`), ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
+  assert.equal(await page.evaluate(`return window.sekwe.library.status`), "ready");
+  assert.deepEqual(await page.evaluate(`return window.sekwe.library.oracles.map((o) => o.name).sort()`), ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
   await page.click("#tab-oracles");
   const names = await page.evaluate(`return [...document.querySelectorAll(".oracle-tree .oracle-button")].map((b) => b.textContent)`);
   assert.deepEqual(names, ["Inkblot", "NPC Motive", "NPC Role", "Weather"]);
@@ -440,7 +440,7 @@ await test("G / and part of a name rolls the oracle into the text, and the journ
   assert.ok(["Rain", "Sun", "Fog"].includes(currentText(record)), currentText(record));
   assert.equal(await pageText(page), `The sky: ${currentText(record)}`, "the typed /wea was left in the text");
   await saved(page);
-  const stored = await page.evaluate(`return (await window.storyboard.store.get(window.storyboard.session.view().currentId))`);
+  const stored = await page.evaluate(`return (await window.sekwe.store.get(window.sekwe.session.view().currentId))`);
   assert.deepEqual(Object.keys(stored.oracles), [`weather@${record.source.version}`]);
   // And back after a reload, as the same chip.
   await openSeeded(page);
@@ -516,7 +516,7 @@ await test("I a wheel edited in Orangey rolls as edited once the tab is back, an
   // Edited in Orangey (here, written straight into the library), then the tab comes back.
   await seedLibrary(page, { "Starforged/Weather.orangey.json": { ...ORACLES["Starforged/Weather.orangey.json"], items: [{ id: "s", label: "Snow", weight: 1 }] } });
   await page.evaluate(`window.dispatchEvent(new Event("focus"))`);
-  await page.waitForFunction(`window.storyboard.library.byId("weather").randomizer.items[0].label === "Snow"`);
+  await page.waitForFunction(`window.sekwe.library.byId("weather").randomizer.items[0].label === "Snow"`);
   assert.deepEqual((await chips(page))[0], first, "reading the library changed the text");
   await typeText(page, " ");
   await slashRoll(page, "weather");
@@ -530,7 +530,7 @@ await test("I a wheel edited in Orangey rolls as edited once the tab is back, an
   `);
   await new Promise((r) => setTimeout(r, 1100));
   await page.evaluate(`window.dispatchEvent(new Event("focus"))`);
-  await page.waitForFunction(`window.storyboard.library.byId("weather") === null`);
+  await page.waitForFunction(`window.sekwe.library.byId("weather") === null`);
   await clickOn(page, ".page .chip");
   await press(page, "r", { alt: true });
   await page.waitForFunction(`document.querySelector(".page .chip").dataset.rerolled === "1"`);
@@ -570,7 +570,7 @@ await test("J an inkblot lands as a small blot in the text, and Put in the text 
 });
 
 await test("K opened from disk, it says it cannot see the library, and dice still roll", async (page) => {
-  const file = `file://${join(dist, "storyboard.html")}?debug&seed=disk`;
+  const file = `file://${join(dist, "sekwe.html")}?debug&seed=disk`;
   await page.goto(file);
   await ready(page);
   await page.click("#tab-oracles");
@@ -580,13 +580,13 @@ await test("K opened from disk, it says it cannot see the library, and dice stil
   assert.deepEqual(page.consoleErrors, []);
 });
 
-await test("L served beside Orangey, Storyboard rolls a wheel made in Orangey itself", async (page) => {
+await test("L served beside Orangey, Sekwe rolls a wheel made in Orangey itself", async (page) => {
   const orangeyDist = join(root, "..", "orangey", "dist");
   if (!existsSync(join(orangeyDist, "index.html"))) {
     console.log("    (no Orangey build beside this folder: run npm run build in ../orangey; skipped)");
     return;
   }
-  const both = serveBoth({ orangey: orangeyDist, storyboard: dist });
+  const both = serveBoth({ orangey: orangeyDist, sekwe: dist });
   await new Promise((r) => both.listen(0, "127.0.0.1", r));
   const origin = `http://127.0.0.1:${both.address().port}`;
   try {
@@ -599,9 +599,9 @@ await test("L served beside Orangey, Storyboard rolls a wheel made in Orangey it
         items: [{ id: "a", label: "The tide is late", weight: 1 }] });
       await state.library.flush();
     `);
-    await page.goto(`${origin}/storyboard/index.html?debug`);
+    await page.goto(`${origin}/sekwe/index.html?debug`);
     await ready(page);
-    await page.waitForFunction(`window.storyboard.library.status === "ready"`);
+    await page.waitForFunction(`window.sekwe.library.status === "ready"`);
     await slashRoll(page, "harbour");
     await page.waitForFunction(`document.querySelector(".page .chip")`);
     assert.equal(currentText((await chips(page))[0]), "The tide is late");
@@ -652,7 +652,7 @@ await test("N a journal rolls only from the folders it is given, and keeps that 
   await press(page, "Escape");
   await saved(page);
   await openSeeded(page);
-  assert.deepEqual(await page.evaluate(`return window.storyboard.session.view().folders`), ["Starforged"]);
+  assert.deepEqual(await page.evaluate(`return window.sekwe.session.view().folders`), ["Starforged"]);
 });
 
 await test("N an oracle clicked in the panel rolls at the cursor, and recent oracles come first", async (page) => {
@@ -700,7 +700,7 @@ await test("O a bag gives each outcome once, and what it has given out is saved 
   const texts = (await chips(page)).map(currentText).sort();
   assert.deepEqual(texts, ["Ace", "King"]);
   await saved(page);
-  const bags = await page.evaluate(`return (await window.storyboard.store.get(window.storyboard.session.view().currentId)).bags`);
+  const bags = await page.evaluate(`return (await window.sekwe.store.get(window.sekwe.session.view().currentId)).bags`);
   assert.deepEqual([...bags.deck].sort(), ["Ace", "King"]);
 });
 
@@ -723,13 +723,13 @@ await test("P a journal's own command rolls everything it lists, one chip each",
   assert.equal(b.source.kind === "dice" && b.source.expression, "2d6");
   await saved(page);
   await openSeeded(page);
-  assert.equal((await page.evaluate(`return window.storyboard.session.view().commands`))[0].name, "feeling");
+  assert.equal((await page.evaluate(`return window.sekwe.session.view().commands`))[0].name, "feeling");
 });
 
 await test("Q the status panel keeps its own notes per journal, and rolls land there too", async (page) => {
   await openMore(page);
   await page.click("#tab-status");
-  await page.evaluate(`window.storyboard.statusEditor.commands.focus("end")`);
+  await page.evaluate(`window.sekwe.statusEditor.commands.focus("end")`);
   await page.waitForFunction(`document.activeElement === document.querySelector(".status-page")`);
   for (const ch of "Supplies: ") {
     await page.send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, key: ch });
@@ -776,7 +776,7 @@ await test("R a table goes in from the toolbar; Tab moves between cells, and row
 await test("S highlight, colour, size and typeface style the selection, and are kept", async (page) => {
   await openMore(page);
   await typeText(page, "danger ahead");
-  await page.evaluate(`window.storyboard.editor.commands.setTextSelection({ from: 1, to: 7 })`);
+  await page.evaluate(`window.sekwe.editor.commands.setTextSelection({ from: 1, to: 7 })`);
   await page.click('[aria-label="Highlight"]');
   await page.click('[aria-label="Yellow highlight"]');
   await page.click('[aria-label="Text colour"]');
@@ -799,13 +799,13 @@ await test("T chapters head the story, the contents list them, and a click jumps
   await typeText(page, "The Wreck");
   await page.evaluate(`document.querySelector('[aria-label^="Chapter heading"]').click()`);
   await page.waitForFunction(`document.querySelector(".page h1")`);
-  await page.evaluate(`window.storyboard.editor.chain().focus("end").insertContent([{ type: "paragraph" }, { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "On the beach" }] }, { type: "paragraph", content: [{ type: "text", text: "Sand." }] }]).run()`);
+  await page.evaluate(`window.sekwe.editor.chain().focus("end").insertContent([{ type: "paragraph" }, { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "On the beach" }] }, { type: "paragraph", content: [{ type: "text", text: "Sand." }] }]).run()`);
   await page.click("#tab-contents");
   await page.waitForFunction(`document.querySelectorAll(".outline li").length === 2`);
   const rows = await page.evaluate(`return [...document.querySelectorAll(".outline li")].map((l) => [l.className, l.textContent.trim()])`);
   assert.deepEqual(rows, [["level-1", "The Wreck"], ["level-2", "On the beach"]]);
   await page.evaluate(`[...document.querySelectorAll(".outline button")][0].click()`);
-  await page.waitForFunction(`window.storyboard.editor.state.selection.$from.parent.textContent === "The Wreck"`);
+  await page.waitForFunction(`window.sekwe.editor.state.selection.$from.parent.textContent === "The Wreck"`);
 });
 
 await test("U the page can be narrow, wide or full, and the choice is kept", async (page) => {
@@ -834,11 +834,11 @@ await test("V a journal saved as a file opens again: as a copy beside the origin
   await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
   await page.click(".file-menu .menu-button");
   await page.click('.file-menu [data-action="save"]');
-  const file = join(dir, "untitled-journal.storyboard.json");
+  const file = join(dir, "untitled-journal.sekwe.json");
   for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
   assert.ok(existsSync(file), "no journal file was downloaded");
   const saved = JSON.parse(readFileSync(file, "utf8"));
-  assert.equal(saved.format, "storyboard-journal");
+  assert.equal(saved.format, "sekwe-journal");
   assert.ok(Object.keys(saved.oracles).length > 0, "the file has no oracle copies to re-roll with");
 
   // The plain file input, as in Firefox: Chrome's own open picker gives the test no file input to fill.
@@ -852,8 +852,8 @@ await test("V a journal saved as a file opens again: as a copy beside the origin
   await page.send("DOM.setFileInputFiles", { files: [file], backendNodeId });
   await page.waitForFunction(`document.querySelector(".dialog [data-choice=copy]")`);
   await page.click(".dialog [data-choice=copy]");
-  await page.waitForFunction(`window.storyboard.session.view().journals.length === 2`);
-  assert.equal(await page.evaluate(`return window.storyboard.session.view().title`), "Untitled journal 2");
+  await page.waitForFunction(`window.sekwe.session.view().journals.length === 2`);
+  assert.equal(await page.evaluate(`return window.sekwe.session.view().title`), "Untitled journal 2");
   assert.match(await pageText(page), /^Saved words (Rain|Sun|Fog)$/);
 
   // Exports land as files too.
@@ -871,8 +871,8 @@ await test("W a journal keeps a copy of its folders, and rolls them from disk on
   await page.click("#tab-oracles");
   await page.click(".folders-line .link-button");
   await page.evaluate(`[...document.querySelectorAll(".folder-option")].find((l) => l.textContent.trim() === "Starforged").querySelector("input").click()`);
-  await page.waitForFunction(`window.storyboard.session.copy?.oracles.length > 0`);
-  const copy = await page.evaluate(`return window.storyboard.session.copy.oracles.map((o) => o.id).sort()`);
+  await page.waitForFunction(`window.sekwe.session.copy?.oracles.length > 0`);
+  const copy = await page.evaluate(`return window.sekwe.session.copy.oracles.map((o) => o.id).sort()`);
   assert.deepEqual(copy, ["ask", "deck", "motive", "npc", "weather"], "the copy is not exactly the chosen folder");
   await typeText(page, "Copied ");
   const dir = join(root, ".tmp", "usb");
@@ -882,13 +882,13 @@ await test("W a journal keeps a copy of its folders, and rolls them from disk on
   await page.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dir });
   await page.click(".file-menu .menu-button");
   await page.click('.file-menu [data-action="save"]');
-  const file = join(dir, "untitled-journal.storyboard.json");
+  const file = join(dir, "untitled-journal.sekwe.json");
   for (let i = 0; i < 100 && !existsSync(file); i++) await new Promise((r) => setTimeout(r, 50));
   assert.ok(existsSync(file), "no journal file was downloaded");
   assert.equal(JSON.parse(readFileSync(file, "utf8")).copy.oracles.length, 5);
 
   // The other computer: the single file from disk, which sees no Orangey library.
-  await page.goto(`file://${join(dist, "storyboard.html")}?debug&seed=usb`);
+  await page.goto(`file://${join(dist, "sekwe.html")}?debug&seed=usb`);
   await ready(page);
   // A real click first: a file chooser opens only after the person has used the page.
   await clickOn(page, ".page");
@@ -906,7 +906,7 @@ await test("W a journal keeps a copy of its folders, and rolls them from disk on
   await page.waitForFunction(`document.querySelector(".library-panel[data-copy=only]")`);
   assert.match(await page.evaluate(`return document.querySelector(".copy-note").textContent`), /copy this journal keeps/);
   assert.equal(await page.evaluate(`return document.querySelectorAll(".oracle-button").length`), 5);
-  await page.evaluate(`window.storyboard.editor.commands.focus("end")`);
+  await page.evaluate(`window.sekwe.editor.commands.focus("end")`);
   await slashRoll(page, "npc role");
   await page.waitForFunction(`document.querySelector(".page .chip")`);
   await press(page, "n", { alt: true });
@@ -935,7 +935,7 @@ await test("X an oracle from an installed pack shows its credit on the chip, and
   await clickOn(page, ".page .chip");
   await page.waitForFunction(`document.querySelector(".chip-popover .credit")`);
   assert.match(await page.evaluate(`return document.querySelector(".chip-popover .credit").textContent.replace(/\\s+/g, " ").trim()`), /^From Delve by A\. Writer · v1\.0 · CC BY 4\.0 · web page$/);
-  const journal = await page.evaluate(`return await window.storyboard.session.current()`);
+  const journal = await page.evaluate(`return await window.sekwe.session.current()`);
   const rec = JSON.stringify(journal.doc).match(/"pack":\{[^}]*\}/);
   assert.ok(rec && rec[0].includes('"author":"A. Writer"'), "the chip did not keep its pack's credit");
   assert.deepEqual(page.consoleErrors, []);

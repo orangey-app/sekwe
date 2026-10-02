@@ -2,14 +2,14 @@
  * Where journals live in the browser.
  *
  * One interface, two implementations: IndexedDB for the app, memory for the
- * unit tests (Node has no IndexedDB). Everything Storyboard keeps in the
- * browser is named "storyboard…", so it never meets Orangey's data, which
+ * unit tests (Node has no IndexedDB). Everything Sekwe keeps in the
+ * browser is named "sekwe…", so it never meets Orangey's data, which
  * shares this site's storage.
  */
 
 import { byRecent, isJournal, summarize, type Journal, type JournalSummary } from "./journal.ts";
 
-export const DB_NAME = "storyboard";
+export const DB_NAME = "sekwe";
 const DB_VERSION = 1;
 const JOURNALS = "journals";
 const META = "meta";

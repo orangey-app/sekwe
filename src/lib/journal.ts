@@ -8,7 +8,7 @@
 
 import type { LibraryCopy } from "./copy.ts";
 
-export const JOURNAL_FORMAT = "storyboard-journal";
+export const JOURNAL_FORMAT = "sekwe-journal";
 export const JOURNAL_FORMAT_VERSION = 1;
 export const TITLE_MAX = 120;
 export const UNTITLED = "Untitled journal";
@@ -121,7 +121,7 @@ export function freshTitle(taken: readonly string[], base = UNTITLED): string {
 
 /**
  * Checks a stored journal well enough to open it. Lenient: a journal written by
- * a newer Storyboard still opens, keeping what this version does not know.
+ * a newer Sekwe still opens, keeping what this version does not know.
  */
 export function isJournal(v: unknown): v is Journal {
   if (typeof v !== "object" || v === null) return false;

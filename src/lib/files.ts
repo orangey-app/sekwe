@@ -6,7 +6,7 @@
  * straight back to it; Save as asks where, and the file chosen becomes the
  * journal's from then on; opening a journal file makes that file the
  * journal's. The link is kept in the browser's storage (a file handle in
- * IndexedDB, database `storyboard-files`), so it outlives a reload; after a
+ * IndexedDB, database `sekwe-files`), so it outlives a reload; after a
  * reload the first Save asks once for permission to edit the file.
  *
  * Firefox and Safari do not let a page write to a file on disk: there every
@@ -49,7 +49,7 @@ export function download(name: string, text: string, mime: string): void {
 /** Whether this browser can write back to a file on disk (Chrome, Edge). */
 export const canWriteFiles = (): boolean => typeof (window as PickerWindow).showSaveFilePicker === "function";
 
-/** "Salt and Iron" → "Salt and Iron.storyboard.json"; a name that already ends so is kept. */
+/** "Salt and Iron" → "Salt and Iron.sekwe.json"; a name that already ends so is kept. */
 export function withSuffix(name: string, suffix: string): string {
   const n = name.trim().replace(/[\\/:*?"<>|]/g, "-");
   return n.toLowerCase().endsWith(suffix.toLowerCase()) ? n : `${n}${suffix}`;
@@ -57,7 +57,7 @@ export function withSuffix(name: string, suffix: string): string {
 
 // --- which file each journal belongs to -----------------------------------------------
 
-const DB = "storyboard-files";
+const DB = "sekwe-files";
 const STORE = "handles";
 /** This page's own memory of them, so nothing waits on storage twice. */
 const memory = new Map<string, FileHandle | null>();
@@ -130,7 +130,7 @@ export interface SaveOptions {
   /** Save as: always ask where. */
   ask?: boolean;
   description?: string;
-  /** What the file name ends in: ".storyboard.json". */
+  /** What the file name ends in: ".sekwe.json". */
   suffix?: string;
   /** For the picker's file types: ".json". */
   extension?: string;

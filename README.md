@@ -1,4 +1,8 @@
-# Storyboard (working title)
+# Sekwe
+
+*sekʷe*, said SEK-weh: from two old roots that sound alike, *sekʷ-* "to
+tell" and *sekʷ-* "to follow". You tell the story; the oracles say where it
+goes next.
 
 A writing page for solo roleplaying games. You write the story; when it needs
 an answer, an oracle from [Orangey](https://github.com/orangey-app/orangey)
@@ -8,20 +12,19 @@ account, and it works offline.
 **Status:** journals with chapters, a status panel, tables and text styling;
 oracles from your Orangey library roll into the text and the status panel;
 journals save to files and export as Markdown, a web page or PDF. Works
-offline. `docs/STATUS.md` says what is next. `docs/STATUS.md` says where the work
-stands; the plan and the decisions behind it are in the project's plan
+offline. `docs/STATUS.md` says where the work stands; the plan and the decisions behind it are in the project's plan
 document.
 
 ## Trying it
 
 ```
 npm run dev       a live page at http://localhost:5173 (no offline worker in this mode)
-npm run build     dist/ (the site, with its offline worker) and dist/storyboard.html (one file)
+npm run build     dist/ (the site, with its offline worker) and dist/sekwe.html (one file)
 npm run preview   serves dist/ at http://localhost:4173, offline worker included
-npm run serve:both  Orangey and Storyboard together at http://127.0.0.1:4321 (build both first)
+npm run serve:both  Orangey and Sekwe together at http://127.0.0.1:4321 (build both first)
 ```
 
-Storyboard reads the Orangey library of the site it is served from: browsers
+Sekwe reads the Orangey library of the site it is served from: browsers
 keep each site's storage apart, so it only sees a library made in Orangey at
 the same address. That is what `serve:both` is for when trying it locally.
 
@@ -96,23 +99,23 @@ oracles it rolled, so it re-rolls on any computer.
   pack's author asks apps not to keep copies; then re-rolling needs the pack).
 - **A journal with folders chosen keeps a copy of them**, with whatever their
   outcomes go to or refer to, so on a computer without Orangey (the journal
-  file on a USB stick, opened in `storyboard.html` from disk) you can still
+  file on a USB stick, opened in `sekwe.html` from disk) you can still
   roll them from the slash menu and the panel. Where Orangey's library is
   present it wins, and the copy is refreshed from it; a folder this computer's
   library does not have is kept as it was. With no folders chosen, nothing
   extra is copied. A wheel edited
-  in Orangey rolls as edited from the next roll (Storyboard reads the library
+  in Orangey rolls as edited from the next roll (Sekwe reads the library
   again whenever its tab comes back); what is already in the text never changes.
 
-`dist/storyboard.html` also opens straight from disk: double-click it.
+`dist/sekwe.html` also opens straight from disk: double-click it.
 
-Journals are kept in this browser (IndexedDB, database `storyboard`) and saved
+Journals are kept in this browser (IndexedDB, database `sekwe`) and saved
 half a second after you stop typing (and at once when you save to a file).
 
 ## How it relates to Orangey
 
-Orangey is where oracles are made and tested; Storyboard is where they are
-played. Both read the same files, and Storyboard rolls them with Orangey's own
+Orangey is where oracles are made and tested; Sekwe is where they are
+played. Both read the same files, and Sekwe rolls them with Orangey's own
 engine, so a roll means the same thing in both.
 
 That engine is copied, not shared as a package. `vendor/orangey/` holds
@@ -135,7 +138,7 @@ own settings file, and the one model file allowed to reach into Orangey's UI.
 ```
 npm run check          the copy of Orangey is untouched
 npm run typecheck      the TypeScript in src/ (not inside .svelte files: keep logic in src/lib)
-npm test               unit tests: Storyboard's own, and Orangey's on the copy
+npm test               unit tests: Sekwe's own, and Orangey's on the copy
 npm run test:browser   the built app in Chrome (run npm run build first)
 ```
 
